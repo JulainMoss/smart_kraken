@@ -195,8 +195,9 @@ def _name_sim(a: str, b: str) -> float:
 
 
 def _title_sim(a: str, b: str) -> tuple[float, list[str]]:
-    generic = {"budow", "siec", "sieci", "wraz", "gminy", "gmina", "gminie", "terenie", "miejsc", "zadani", "realiz", "przebud", "rozbud",
-               "sanita", "kanali", "wodoci"}
+    generic = {stem(w) for w in ("budowa", "budowy", "sieci", "sieć", "wraz", "gminy", "gmina", "gminie", "terenie", "miejscowości", "zadania",
+               "realizacja", "przebudowa", "rozbudowa", "modernizacja", "sanitarnej", "kanalizacji", "kanalizacyjnej", "wodociągowej",
+               "wodociągu", "przyłączami", "ścieków", "oczyszczalni", "budowie", "odcinka", "odcinków", "ulicy", "deszczowej")}
     sa = {stem(t) for t in tokens(a)}
     sb = {stem(t) for t in tokens(b)}
     if not sa or not sb:
@@ -234,9 +235,19 @@ def link_project(conn: sqlite3.Connection, project_id: str, live: bool = True, p
                     r = one(conn, "SELECT tender_id, notice_number FROM notices WHERE notice_number LIKE ?", (bzp_base(pub_norm) + "/%",))
             except Exception as e:
                 say(f"API BZP niedostępne: {e}")
+        via_ref = False
+        if not r:
+            # numer nie występuje jako ogłoszenie, ale może być przywołany w ogłoszeniu o wyniku/zmianie/wykonaniu umowy
+            for pat in (f'%"contract_notice": "{pub_norm}"%', f'%"result_notice": "{pub_norm}"%'):
+                r = one(conn, "SELECT tender_id, notice_number FROM notices WHERE data LIKE ? LIMIT 1", (pat,))
+                if r:
+                    via_ref = True
+                    say(f"Numer {pub_norm} przywołany w ogłoszeniu {r['notice_number']}")
+                    break
         if r:
             proc = one(conn, "SELECT * FROM procedures WHERE tender_id=?", (r["tender_id"],)) or {}
-            conf, ev = 1.0, [f"numer ogłoszenia {pub_norm} znaleziony w BZP"]
+            conf, ev = (0.95, [f"ogłoszenie {pub_norm} nie występuje w BZP/API, ale jest przywołane jako ogłoszenie o zamówieniu w {r['notice_number']}"]) \
+                if via_ref else (1.0, [f"numer ogłoszenia {pub_norm} znaleziony w BZP"])
             status = "auto"
             if nip and proc.get("nip") and proc["nip"] != nip:
                 conf, status = 0.6, "uncertain"
@@ -248,11 +259,12 @@ def link_project(conn: sqlite3.Connection, project_id: str, live: bool = True, p
             if ts_ < 0.25:
                 conf, status = min(conf, 0.7), "uncertain"
                 ev.append("UWAGA: nazwa przedsięwzięcia słabo zgodna z nazwą postępowania")
-            links.append({"target_id": r["tender_id"], "title": proc.get("title"), "basis": "numer ogłoszenia BZP", "confidence": conf,
+            links.append({"target_id": r["tender_id"], "title": proc.get("title"),
+                          "basis": "numer ogłoszenia BZP (odwołanie w innym ogłoszeniu)" if via_ref else "numer ogłoszenia BZP", "confidence": conf,
                           "evidence": ev, "status": status})
     # 2) NIP + podobieństwo (projekty KPO, brak numeru, lub dodatkowe postępowania tego samego projektu)
     cands = rows(conn, "SELECT * FROM procedures WHERE nip=?", (nip,)) if nip else []
-    if live and nip and (not links or not cands):
+    if live and nip and (not links or not cands or not pub_norm):
         try:
             say(f"Pobieram ogłoszenia zamawiającego „{p['org_name']}” z API BZP…")
             short = re.split(r"\s+[–-]\s+", p.get("org_name") or "")[0]
@@ -292,10 +304,15 @@ def link_project(conn: sqlite3.Connection, project_id: str, live: bool = True, p
             s += 0.03
         scored.append((min(0.97, s), c, ev, ts_))
     scored.sort(key=lambda x: -x[0])
-    for s, c, ev, ts_ in scored[:4]:
-        if ts_ < 0.2 or s < 0.5:
+    second = scored[1][0] if len(scored) > 1 else 0.0
+    for i, (s, c, ev, ts_) in enumerate(scored[:4]):
+        if links:
+            # projekt ma już pewne postępowanie – inne tylko gdy bardzo podobne (np. powtórzone po unieważnieniu)
+            if ts_ < 0.6 or s < 0.75:
+                continue
+        elif ts_ < 0.25 or s < 0.55:
             continue
-        status = "auto" if (s >= 0.8 and not links) else "uncertain"
+        status = "auto" if (i == 0 and s >= 0.8 and s - second >= 0.08 and not links) else "uncertain"
         basis = "NIP + podobieństwo nazwy" if not links else "powiązane postępowanie (NIP + nazwa)"
         links.append({"target_id": c["tender_id"], "title": c.get("title"), "basis": basis, "confidence": round(s, 2), "evidence": ev, "status": status})
     # zapis (nie nadpisujemy decyzji eksperta)
@@ -327,10 +344,11 @@ def enrich_project(conn: sqlite3.Connection, project_id: str, live: bool = True,
         raise KeyError(project_id)
     links = link_project(conn, project_id, live=live, progress=say)
     say(f"Powiązano {len(links)} postępowań BZP")
-    tids = [l["target_id"] for l in links if l["status"] in ("auto", "approved", "uncertain") and l["confidence"] >= 0.6]
+    tids = [l["target_id"] for l in links if l["status"] in ("auto", "approved")]
     org = one(conn, "SELECT * FROM organizations WHERE nip=? ORDER BY last_seen DESC LIMIT 1", (digits(p.get("org_id")),)) or {}
     results = {"bzp": len(tids), "ted": 0, "kio": 0, "bip": 0, "nik": 0, "documents": 0, "events": 0}
     kw = _keywords(p)
+    conn.commit()
     if external and live:
         # TED – zamówienia powyżej progów UE
         try:
@@ -391,7 +409,8 @@ def enrich_project(conn: sqlite3.Connection, project_id: str, live: bool = True,
         # NIK – kontrole dotyczące zamawiającego
         try:
             short = re.split(r"\s+[–-]\s+", p.get("org_name") or "")[0]
-            for h in ext.nik_search(short)[:3]:
+            core = fold(re.sub(r"^(Gmina|Miasto i Gmina|Miasto|Gmina Miejska)\s+", "", short))[:6]
+            for h in [x for x in ext.nik_search(short) if core and core in fold(x["title"])][:3]:
                 _add_link(conn, project_id, "nik", h["url"], h["title"][:200], "NIK", h["url"], "wyszukiwarka NIK (nazwa zamawiającego)", 0.4,
                           [f"wynik wyszukiwania: {short}"], "uncertain")
                 results["nik"] += 1
@@ -431,6 +450,7 @@ def _add_link(conn, project_id, ttype, tid, title, system, url, basis, conf, ev,
     conn.execute("""INSERT INTO project_links (project_id,target_type,target_id,title,source_system,url,match_basis,confidence,evidence,status,created_at)
         VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(project_id,target_type,target_id) DO UPDATE SET confidence=excluded.confidence, evidence=excluded.evidence""",
                  (project_id, ttype, tid, title, system, url, basis, conf, j(ev), status, now_iso()))
+    conn.commit()   # krótkie transakcje – nie blokujemy bazy podczas pobierania z sieci
 
 
 def _store_doc(conn, doc_id, project_id, tender_id, system, dtype, title, url, pages, sha=None, mime=None, local_path=None, meta=None):
@@ -440,6 +460,7 @@ def _store_doc(conn, doc_id, project_id, tender_id, system, dtype, title, url, p
         text_z=excluded.text_z, fetched_at=excluded.fetched_at, pages=excluded.pages, chars=excluded.chars""",
                  (doc_id, project_id, tender_id, system, dtype, title, url, local_path, now_iso(), sha or hashlib.sha256(text.encode()).hexdigest(),
                   mime, len(pages), len(text), zpack(j([[n, t] for n, t in pages])), j(meta or {}), "new"))
+    conn.commit()
 
 
 def import_document(conn: sqlite3.Connection, filename: str, data: bytes, project_id: str | None = None, tender_id: str | None = None,
@@ -510,7 +531,8 @@ def analyze_document(conn: sqlite3.Connection, doc_id: str) -> int:
 
 def project_summary(conn: sqlite3.Connection, project_id: str) -> dict[str, Any]:
     links = rows(conn, "SELECT * FROM project_links WHERE project_id=? AND status!='rejected'", (project_id,))
-    tids = [l["target_id"] for l in links if l["target_type"] == "procedure" and l["confidence"] >= 0.6]
+    # podsumowanie tylko z powiązań pewnych lub zatwierdzonych przez eksperta (niepewne czekają na decyzję)
+    tids = [l["target_id"] for l in links if l["target_type"] == "procedure" and l["status"] in ("auto", "approved")]
     procs = rows(conn, f"SELECT * FROM procedures WHERE tender_id IN ({','.join('?' * len(tids))})", tids) if tids else []
     ev = rows(conn, f"SELECT risk_code, status FROM risk_events WHERE (tender_id IN ({','.join('?' * len(tids))}) OR project_id=?) AND status!='rejected'",
               tids + [project_id]) if tids else rows(conn, "SELECT risk_code, status FROM risk_events WHERE project_id=? AND status!='rejected'", (project_id,))

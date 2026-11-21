@@ -295,6 +295,15 @@ def _flags(P, time_fc, cost_fc, budget, tender, risks, checklist, n) -> list[dic
     if "droga_kraj_woj" in feats or "kolej" in feats or "ciek" in feats:
         add("amber", "Przejścia przez drogi wyższej kategorii / kolej / cieki – uzgodnienia z podmiotami trzecimi (R04) i technologia bezwykopowa.",
             "elementy w opisie", "WNIOSEK")
+    share = {r["code"]: r for r in risks}
+    for feat, code, txt in (("tereny_prywatne", "R03", "Trasa przez grunty prywatne – brak zgód/służebności to częsta przyczyna zmian trasy i opóźnień"),
+                            ("natura2000", "R04", "Obszar Natura 2000 / chroniony – wymagane rozpoznanie środowiskowe i dodatkowe uzgodnienia"),
+                            ("wody_gruntowe", "R02", "Wysokie wody gruntowe / słabe grunty – ryzyko odwodnień, wymiany gruntu i robót dodatkowych"),
+                            ("dofinansowanie_ue", "R13", "Finansowanie zewnętrzne – terminy rozliczenia dotacji wymuszają realny harmonogram")):
+        if feat in feats:
+            r = share.get(code)
+            basis = f"{code}: {r['cases']} z {n} podobnych inwestycji ({_pct(r['share'])})" if r else f"{code} – katalog ekspercki MFiPR"
+            add("amber", txt + ".", basis, "WNIOSEK")
     missing = [x for x in checklist if not x["present"]]
     if len(missing) >= 5:
         add("amber", f"Opis nie zawiera {len(missing)} z {len(checklist)} informacji z listy kontrolnej przygotowania – patrz „Do uzupełnienia”.",

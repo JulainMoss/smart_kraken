@@ -241,3 +241,4 @@ def log_source(conn: sqlite3.Connection, system: str, operation: str, url: str, 
     conn.execute("INSERT INTO sources (source_system,operation,url,http_status,records,sha256,local_path,started_at,finished_at,meta) "
                  "VALUES (?,?,?,?,?,?,?,?,?,?)",
                  (system, operation, url, status, records, sha256, local_path, started_at or now_iso(), now_iso(), j(meta or {})))
+    conn.commit()

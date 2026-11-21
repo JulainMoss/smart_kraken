@@ -232,7 +232,7 @@ function renderReport(r){
       <div class="sub">${t.delay_k} z ${t.delay_n} umów po terminie<br>90% przedział: ${pct(t.delay_ci90[0])}–${pct(t.delay_ci90[1])}</div></div>
     <div class="metric ${c.share_increase >= .4 ? "warn" : ""}"><div class="lbl">Zmiana kosztu umowy</div><div class="val">${sgn(ch.median)}</div>
       <div class="sub">mediana · w ${pct(c.share_increase)} umów wzrost<br>10% najgorszych: ${sgn(ch.p90)} (N=${ch.n||0})</div></div>
-    <div class="metric"><div class="lbl">Rzeczywisty czas robót</div><div class="val">${t.actual_days?.median ? Math.round(t.actual_days.median/30.44*10)/10 + " mies." : "b.d."}</div>
+    <div class="metric"><div class="lbl">Rzeczywisty czas robót</div><div class="val">${t.actual_days?.median ? (t.actual_days.median/30.44).toLocaleString("pl-PL",{maximumFractionDigits:1}) + " mies." : "b.d."}</div>
       <div class="sub">mediana · połowa trwała od ${days(t.actual_days?.p25)} do ${days(t.actual_days?.p75)}</div></div>
     <div class="metric ${b.verdict === "niski" ? "bad" : b.verdict === "wysoki" ? "warn" : b.verdict ? "ok" : ""}"><div class="lbl">Ocena budżetu</div>
       <div class="val">${b.verdict ? b.verdict : "—"}</div><div class="sub">${b.user_per_km ? `${pln(b.user_per_km)}/km wobec mediany ${pln(b.per_km.median)}/km` : (b.per_km?.n ? `koszt 1 km: mediana ${pln(b.per_km.median)}` : "podaj budżet i długość sieci")}</div></div>

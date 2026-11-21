@@ -26,10 +26,11 @@ def extract_length_km(text: str) -> float | None:
     """Szacuje łączną długość sieci w km z opisu (np. '2,38 kilometra', '3794m', '11,871 km', '659,0 mb')."""
     t = fold(text)
     t = t.replace("\xa0", " ")
+    tot_km = None
     tot = re.search(r"(?:lacznej|calkowit\w*|sumaryczn\w*) dlugosc\w*[^0-9]{0,40}" + _NUM + r"\s*(km|kilometr|m\b|mb\b|metr)", t)
     if tot:
         v = _num(tot.group(1), tot.group(2))
-        return round(v if tot.group(3).startswith("k") else v / 1000.0, 3)
+        tot_km = round(v if tot.group(3).startswith("k") else v / 1000.0, 3)
     vals = []
     for m in re.finditer(_NUM + r"\s*(km\b|kilometr\w*|mb\b|m\b|metr\w*|m\.b\.)", t):
         v = _num(m.group(1), m.group(2))
@@ -42,7 +43,9 @@ def extract_length_km(text: str) -> float | None:
         if 0.01 <= km <= 300:
             vals.append(km)
     if not vals:
-        return None
+        return tot_km
+    if tot_km and tot_km >= 0.9 * max(vals):
+        return tot_km          # „o łącznej długości” obejmuje całość
     s, mx = sum(vals), max(vals)
     return round(s if s <= 2.2 * mx else mx, 3)
 

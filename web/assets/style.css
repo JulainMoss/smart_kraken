@@ -184,3 +184,4 @@ mark{background:#ffe58a;padding:0 2px}
   .container{padding:0}
   .print-all [data-tabpane]{display:block!important}
 }
+.badge[hidden]{display:none}
