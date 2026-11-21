@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Kraken · analiza opisu inwestycji</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%233ee08a%27/%3E%3Ctext x=%2716%27 y=%2721%27 font-family=%27Arial%27 font-weight=%27800%27 font-size=%2712%27 text-anchor=%27middle%27 fill=%27%2304160c%27%3ESK%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="logo">SK</div>
+  <div>
+    <h1>Smart Kraken</h1>
+    <div class="sub">Analiza opisu inwestycji lokalnym modelem językowym</div>
+  </div>
+  <div class="status" id="status" title="Stan lokalnego modelu"><span class="dot"></span><span id="statusText">Sprawdzam model…</span></div>
+</header>
+
+<main class="layout">
+  <!-- tekst wejściowy -->
+  <section class="panel input-panel">
+    <div class="panel-head">
+      <h2>Opis inwestycji</h2>
+      <div class="head-actions">
+        <button type="button" class="ghost" id="btnExample">Przykład</button>
+        <label class="btn ghost" for="fileInput">Wczytaj plik</label>
+        <input type="file" id="fileInput" accept=".txt,.md,.csv,.html,.htm,text/plain" hidden>
+        <button type="button" class="ghost" id="btnClear">Wyczyść</button>
+      </div>
+    </div>
+    <p class="hint">Wklej dowolny tekst w języku naturalnym – opis zadania, fragment uchwały, notatkę, ogłoszenie, e-mail.
+      Model wyciągnie z niego dane inwestycji. Tekst nie opuszcza komputera.</p>
+
+    <div class="editor-wrap">
+      <textarea id="text" spellcheck="false" placeholder="np. Gmina Rydzyna planuje w przyszłym roku budowę sieci kanalizacji sanitarnej w ul. Wolności o długości ok. 3,6 km. Szacowany koszt to 4,2 mln zł brutto, a realizacja potrwa 18 miesięcy od podpisania umowy…"></textarea>
+      <div class="marked" id="marked" hidden></div>
+      <div class="drop" id="drop">Upuść plik tekstowy</div>
+    </div>
+
+    <div class="input-foot">
+      <span id="chars" class="muted">0 znaków</span>
+      <button type="button" class="ghost small" id="btnEdit" hidden>Edytuj tekst</button>
+      <div class="spacer"></div>
+      <button type="button" class="ghost" id="btnCancel" hidden>Przerwij</button>
+      <button type="button" class="primary" id="btnAnalyze">Analizuj <kbd>Ctrl</kbd><kbd>Enter</kbd></button>
+    </div>
+  </section>
+
+  <!-- wynik -->
+  <section class="panel result-panel">
+    <div class="panel-head">
+      <h2>Wyciągnięte informacje</h2>
+      <div class="head-actions">
+        <button type="button" class="ghost" id="btnCopy" disabled>Kopiuj JSON</button>
+        <button type="button" class="ghost" id="btnDownload" disabled>Pobierz JSON</button>
+      </div>
+    </div>
+    <div id="banner"></div>
+    <div id="result">
+      <div class="empty" id="empty">
+        <div class="big">🐙</div>
+        <h3>Wklej opis i kliknij „Analizuj”</h3>
+        <p>Otrzymasz: zamawiającego, rodzaj zamówienia, miejscowość, województwo, planowaną kwotę, planowany czas i słowa kluczowe – każde z cytatem z tekstu.</p>
+      </div>
+    </div>
+    <div class="meta muted" id="meta"></div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+<script src="assets/app.js"></script>
+</body>
+</html>
