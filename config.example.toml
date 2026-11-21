@@ -1,0 +1,45 @@
+# Risk Miner – przykładowa konfiguracja.
+# Skopiuj do config.toml i zmień wartości. Każdą wartość można też nadpisać zmienną środowiskową
+# w formacie RISKMINER_<SEKCJA>_<KLUCZ>, np. RISKMINER_LLM_PROVIDER=openai, RISKMINER_SERVER_PORT=8080.
+
+[server]
+host = "127.0.0.1"          # "0.0.0.0" – udostępnienie w sieci (np. na serwerze / w kontenerze)
+port = 8000
+open_browser = true
+
+[data]
+db_path = "data/riskminer.sqlite"                                   # baza SQLite (ok. 600 MB dla pełnej kopii BZP wod-kan)
+bzp_mirror_jsonl = "../risk_miner_bzp_kopia/bzp_kopia/notices.jsonl" # kopia ogłoszeń BZP (https://bzp.cytr.us/paczka/risk_miner_bzp_kopia.zip)
+data_lake = "../risk_miner_bzp_kopia/data_lake"                      # zasoby pobrane przez harvestery (KIO, TED, KPOŚK, BZP innych sektorów)
+uploads = "data/uploads"                                             # wgrane dokumenty
+
+[sources]
+bzp_api = "https://bzp.cytr.us"               # kopia API BZP na czas HackNation (bez limitu); produkcja poniżej
+bzp_api_fallback = "https://ezamowienia.gov.pl"   # API e-Zamówień: limit 30 zapytań/min (system go przestrzega)
+ted_api = "https://api.ted.europa.eu/v3/notices/search"
+saos_api = "https://www.saos.org.pl/api"      # orzeczenia KIO (System Analizy Orzeczeń Sądowych)
+user_agent = "RiskMiner/1.0 (prototyp MFiPR)"
+request_delay_s = 0.5                          # odstęp między zapytaniami do BIP/NIK
+bip_max_pages = 40                             # limit stron przeszukiwanych w BIP jednego zamawiającego
+
+[llm]
+# Model językowy jest OPCJONALNY. provider = "none" -> reguły eksperckie + statystyka (działa offline, dane nie opuszczają komputera).
+#
+# 1) Lokalnie (dane zostają na komputerze) – Ollama + polski model Bielik:
+#      ollama pull SpeakLeash/bielik-11b-v3.0-instruct:Q4_K_M
+#    provider = "ollama", base_url = "http://127.0.0.1:11434"
+#
+# 2) Własny klucz w chmurze (API zgodne z OpenAI), np. Mistral (dane przetwarzane w UE):
+#    provider = "openai", base_url = "https://api.mistral.ai/v1", model = "mistral-small-latest"
+#    i ustaw zmienną środowiskową z kluczem:  export RISKMINER_LLM_API_KEY="..."
+#    Inne: OpenAI (https://api.openai.com/v1, poza UE), OpenRouter, Groq, vLLM / llama.cpp (lokalnie).
+provider = "none"
+base_url = "http://127.0.0.1:11434"
+model = "SpeakLeash/bielik-11b-v3.0-instruct:Q4_K_M"
+api_key_env = "RISKMINER_LLM_API_KEY"   # nazwa zmiennej środowiskowej z kluczem (klucza nie zapisujemy w pliku)
+temperature = 0.0
+timeout_s = 180
+data_location = "lokalnie (bez modelu językowego)"   # opis wyświetlany użytkownikom: lokalnie / UE / poza UE
+
+[expert]
+default_reviewer = "ekspert"

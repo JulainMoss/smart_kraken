@@ -1,7 +1,18 @@
 [project]
-name = "smart-kraken"
-version = "0.1.0"
-description = "Analiza opisu inwestycji lokalnym LLM – wyciąganie zamawiającego, kwoty, terminu i słów kluczowych"
+name = "riskminer"
+version = "1.0.0"
+description = "Risk Miner – inteligentna baza doświadczeń inwestycji publicznych (HackNation 2026, wyzwanie MFiPR)"
 readme = "README.md"
-requires-python = ">=3.14"
-dependencies = []
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = []          # wyłącznie biblioteka standardowa Pythona
+
+[project.optional-dependencies]
+pdf = ["pypdf>=4"]         # lepszy odczyt PDF (bez niego: pdftotext z poppler-utils, jeśli zainstalowany)
+xls = ["xlrd>=2", "openpyxl>=3"]
+
+[project.scripts]
+riskminer = "riskminer.__main__:main"
+
+[tool.setuptools]
+packages = ["riskminer", "riskminer.sources"]

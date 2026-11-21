@@ -1,16 +1,18 @@
-# Python-generated files
+# Python
 __pycache__/
 *.py[oc]
 build/
 dist/
-wheels/
 *.egg-info
-
-# Virtual environments
 .venv
 
-# pliki postępowań zapisywane przez serwer (/ez/save)
-pliki/
+# dane lokalne (baza budowana poleceniem: python -m riskminer build)
+data/*.sqlite
+data/*.sqlite-*
+data/uploads/
+config.toml
+wyniki_testu/
 
-# zapis zapytań i odpowiedzi modelu (debug)
+# zapis zapytań i odpowiedzi modelu (debug – narzędzie ekstraktora)
 debug/
+pliki/
