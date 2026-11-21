@@ -455,7 +455,7 @@ async function viewProject(pid){
   </div>
   <div class="card">
     <div class="tabs" id="ptabs"><button data-tab="links" class="active">Powiązania ze źródłami (${links.length})</button><button data-tab="course">Przebieg (${rec.procedures.length})</button>
-      <button data-tab="events">Zdarzenia ryzyka (${rec.risk_events.length})</button><button data-tab="docs">Dokumenty (${rec.documents.length})</button><button data-tab="data">Dane i walidacja</button><button data-tab="hist">Historia</button></div>
+      <button data-tab="events">Zdarzenia ryzyka (${rec.risk_events.length})</button><button data-tab="docs">Dokumenty (${rec.documents.length})</button><button data-tab="data">Braki i walidacja${(s.gaps||[]).length?` (${s.gaps.length})`:""}</button><button data-tab="hist">Historia</button></div>
     <div data-tabpane="links">${renderLinks(links)}</div>
     <div data-tabpane="course" hidden>${rec.procedures.map(renderProcedure).join("") || `<div class="empty">Brak powiązanych postępowań.</div>`}</div>
     <div data-tabpane="events" hidden>${renderEventList(rec.risk_events, true)}</div>
@@ -464,6 +464,8 @@ async function viewProject(pid){
       <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Źródło</th><th>Typ</th><th>Tytuł</th><th>Pobrano</th><th>Znaki</th></tr></thead><tbody>
       ${rec.documents.map(d=>`<tr class="click" data-doc="${esc(d.doc_id)}"><td>${esc(d.source_system)}</td><td>${esc(d.doc_type)}</td><td>${esc(d.title)}</td><td>${esc((d.fetched_at||"").slice(0,16))}</td><td class="num">${(d.chars||0).toLocaleString("pl-PL")}</td></tr>`).join("")||`<tr><td colspan="5" class="muted">brak dokumentów</td></tr>`}</tbody></table></div></div>
     <div data-tabpane="data" hidden>
+      ${(s.gaps||[]).length?`<h3>Braki w pakiecie danych</h3><p class="muted">Brak dokumentu w pakiecie nie oznacza, że zdarzenie nie wystąpiło – poniżej: czego brakuje, dlaczego to ważne i skąd to uzupełnić.</p>
+        <ul class="clean" style="margin-bottom:14px">${s.gaps.map(g=>`<li>${tag({error:"brak krytyczny",warning:"ważne",info:"uzupełnij"}[g.level]||g.level,{error:"bad",warning:"warn",info:"grey"}[g.level]||"grey")} <b>${esc(g.item)}</b> – ${esc(g.why)}<br><small>Skąd: ${esc(g.where)}</small></li>`).join("")}</ul>`:""}
       <h3>Walidacja identyfikatorów</h3><ul class="clean">${(p.validation||[]).map(v=>`<li>${tag(v.level, {ok:"ok",info:"grey",warning:"warn",error:"bad"}[v.level])} <b>${esc(v.field)}</b>: ${esc(v.message)}</li>`).join("")}</ul>
       <h3 style="margin-top:14px">Rekord źródłowy ${KIND_TAG.DANE}</h3><dl class="kv">${Object.entries(p.raw||{}).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl></div>
     <div data-tabpane="hist" hidden>${rec.expert_history.length?`<ul class="clean">${rec.expert_history.map(h=>`<li>${esc(h.ts)} · <b>${esc(h.reviewer)}</b> · ${esc(h.entity_type)} ${esc(h.entity_id)} · ${esc(h.action)} ${esc(h.comment||"")}</li>`).join("")}</ul>`:`<div class="empty">Brak decyzji eksperta dla tego projektu.</div>`}</div>

@@ -39,6 +39,9 @@ def extract_length_km(text: str) -> float | None:
         # pomijamy głębokości, średnice, powierzchnie i odległości niezwiązane z siecią
         if re.search(r"glebok|szerok|wysok|srednic|dn\s*$|odleglos|powierzchn|m2|m3", ctx[-25:]):
             continue
+        # fragmenty trasy już zawarte w długości całkowitej („część trasy (ok. 1,4 km) przebiega przez…”)
+        if re.search(r"czesc\w* trasy|fragment\w*|w tym|z czego|na odcinku", ctx[-40:]):
+            continue
         km = v if unit.startswith("k") else v / 1000.0
         if 0.01 <= km <= 300:
             vals.append(km)

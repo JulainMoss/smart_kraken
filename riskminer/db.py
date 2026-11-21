@@ -211,8 +211,17 @@ def seed_knowledge(conn: sqlite3.Connection, overwrite: bool = False) -> None:
         conn.execute(f"{verb} INTO sectors VALUES (?,?,?,?,?)", (s["code"], s["name"], s["status"], j(s["cpv_prefixes"]), ts))
     for s in catalog.SUBSECTORS:
         conn.execute(f"{verb} INTO subsectors VALUES (?,?,?,?,?,?)", (s["code"], s["sector"], s["name"], s["scope"], j(s["patterns"]), ts))
+    edited = {r[0] for r in conn.execute("SELECT DISTINCT entity_id FROM expert_log WHERE entity_type='katalog ryzyk'")}
     for r in catalog.RISKS:
-        conn.execute(f"{verb} INTO risk_catalog (code,name,status,effects,patterns,mitigations,clauses,checklist,sector,proposed_by,updated_at) "
+        # reguły systemowe aktualizujemy, chyba że ekspert je edytował (wtedy decyzja eksperta ma pierwszeństwo)
+        v = verb if (r["code"] in edited) else "INSERT OR REPLACE"
+        if r["code"] not in edited:
+            old = conn.execute("SELECT status FROM risk_catalog WHERE code=?", (r["code"],)).fetchone()
+            status = old[0] if old else r["status"]
+        else:
+            status = r["status"]
+        r = {**r, "status": status}
+        conn.execute(f"{v} INTO risk_catalog (code,name,status,effects,patterns,mitigations,clauses,checklist,sector,proposed_by,updated_at) "
                      "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                      (r["code"], r["name"], r["status"], r["effects"], j(r["patterns"]), j(r["mitigations"]), j(r["clauses"]),
                       j(r["checklist"]), "*", "system" if r["status"] == "proposed" else "MFiPR", ts))

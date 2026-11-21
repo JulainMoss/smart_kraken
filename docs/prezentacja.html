@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pl"><head><meta charset="utf-8"><title>Risk Miner – prezentacja</title>
+<style>
+@page{size:1280px 720px;margin:0}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",Roboto,Arial,sans-serif;color:#1b2430;background:#e9edf2}
+.s{width:1280px;height:720px;background:#fff;position:relative;overflow:hidden;page-break-after:always;padding:56px 72px;margin:0 auto 20px}
+.s:after{content:"Risk Miner · HackNation 2026 · MFiPR";position:absolute;bottom:22px;left:72px;font-size:13px;color:#8a95a5}
+.n{position:absolute;bottom:20px;right:72px;font-size:13px;color:#8a95a5}
+.bar{position:absolute;top:0;left:0;right:0;height:8px;background:#0b3b7a}
+h1{font-size:52px;margin:0 0 14px;color:#0b3b7a}
+h2{font-size:36px;margin:0 0 24px;color:#0b3b7a}
+p,li{font-size:22px;line-height:1.45}
+ul{padding-left:26px;margin:0}
+li{margin-bottom:10px}
+.lead{font-size:26px;color:#334155}
+.grid{display:grid;gap:22px}
+.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}.g4{grid-template-columns:repeat(4,1fr)}
+.m{border:1px solid #dde3ea;border-radius:10px;padding:18px 20px;background:#f8fafc}
+.m b{display:block;font-size:44px;color:#0b3b7a;line-height:1.1}
+.m span{font-size:17px;color:#5d6876}
+.red b{color:#b4332a}
+.box{border-left:5px solid #1f5fb8;background:#f3f7fd;padding:14px 18px;border-radius:0 8px 8px 0;font-size:19px}
+img{max-width:100%;border:1px solid #dde3ea;border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,.08)}
+.title{background:#0b3b7a;color:#fff}
+.title h1{color:#fff;font-size:68px;margin-top:150px}
+.title p{color:#dbe6f7}
+.title:after{color:#9fb6d9}
+.step{display:flex;gap:16px;align-items:flex-start;margin-bottom:18px}
+.step i{font-style:normal;background:#0b3b7a;color:#fff;border-radius:50%;width:40px;height:40px;display:grid;place-items:center;font-weight:700;flex:none;font-size:20px}
+table{border-collapse:collapse;width:100%;font-size:18px}
+td,th{border-bottom:1px solid #e6eaf0;padding:8px 10px;text-align:left}
+th{color:#5d6876;font-size:15px;text-transform:uppercase}
+.tag{display:inline-block;font-size:15px;padding:2px 10px;border-radius:999px;font-weight:600}
+.t1{background:#e9effc;color:#2457c5}.t2{background:#eef1f5;color:#4b5b70}.t3{background:#f2ecfa;color:#7a4fb8}
+</style></head><body>
+
+<section class="s title"><div class="bar" style="background:#1f5fb8"></div>
+<h1>Risk Miner</h1>
+<p class="lead" style="color:#fff;font-size:30px">Cyfrowa pamięć instytucjonalna inwestycji publicznych</p>
+<p>Opisz planowaną inwestycję zwykłym językiem – zobacz, co poszło nie tak w podobnych inwestycjach w całej Polsce,<br>ile naprawdę trwały i kosztowały, i jak tego uniknąć.</p>
+<p style="margin-top:60px;font-size:18px">HackNation 2026 · wyzwanie Ministerstwa Funduszy i Polityki Regionalnej (Departament PPP)</p>
+<span class="n" style="color:#9fb6d9">1</span></section>
+
+<section class="s"><div class="bar"></div><h2>Problem: te same błędy powtarzają się w tysiącach gmin</h2>
+<div class="grid g4" style="margin-bottom:28px">
+<div class="m red"><b>35%</b><span>zakończonych umów wod-kan wykonano po pierwotnym terminie (N = 16 600)</span></div>
+<div class="m red"><b>88 dni</b><span>średnie opóźnienie, gdy wystąpiło</span></div>
+<div class="m red"><b>31%</b><span>umów – wypłacono więcej niż pierwotna wartość umowy</span></div>
+<div class="m red"><b>6 668</b><span>postępowań unieważnionych, bo cena przekroczyła budżet</span></div></div>
+<ul><li>Wiedza o przebiegu inwestycji jest <b>rozproszona</b>: ogłoszenia o zmianie i wykonaniu umowy w BZP, TED, KIO, BIP-y gmin, NIK.</li>
+<li>Nikt jej nie zbiera – urzędnik planujący kanalizację nie wie, że sąsiednia gmina miała ten sam problem z gruntami prywatnymi.</li>
+<li>Dane: kopia BZP wod-kan 2021–2026 przetworzona przez Risk Minera (47 mld zł wartości umów).</li></ul>
+<span class="n">2</span></section>
+
+<section class="s"><div class="bar"></div><h2>Rozwiązanie: 3 kroki dla urzędnika</h2>
+<div class="grid g2"><div>
+<div class="step"><i>1</i><div><p style="margin:0"><b>Opis inwestycji</b> – wklejony tekst albo wstępne dokumenty (DOCX, PDF).</p></div></div>
+<div class="step"><i>2</i><div><p style="margin:0"><b>Sprawdzenie parametrów</b> – podsektor, skala, budżet, termin, elementy techniczne; każdy z cytatem z opisu.</p></div></div>
+<div class="step"><i>3</i><div><p style="margin:0"><b>Raport</b> – ryzyko opóźnienia, realny czas i koszt, ocena budżetu (zł/km), czerwone flagi, problemy z dowodami, rekomendacje, zapisy umowne, <b>kontakty</b> do gmin, które to robiły.</p></div></div>
+<div class="box">Działa bez modelu językowego i bez internetu. Model (np. polski Bielik lokalnie) – opcjonalnie, w konfiguracji.</div>
+</div><div><img src="img/analiza.png" style="max-height:470px"></div></div>
+<span class="n">3</span></section>
+
+<section class="s"><div class="bar"></div><h2>Automatyczna baza doświadczeń z danych publicznych</h2>
+<div class="grid g2"><div><table>
+<tr><th>Źródło</th><th>Co wnosi</th></tr>
+<tr><td><b>BZP / e-Zamówienia</b><br>113 tys. ogłoszeń</td><td>45 tys. postępowań, 39 tys. umów, <b>28,6 tys. zmian umów</b> (art. 455: przyczyna, opis, wartość), wykonanie, unieważnienia</td></tr>
+<tr><td><b>API BZP na żywo</b></td><td>brakujące ogłoszenia, monitoring trwających inwestycji</td></tr>
+<tr><td><b>TED · KIO (SAOS) · NIK</b></td><td>zamówienia unijne, odwołania, kontrole</td></tr>
+<tr><td><b>BIP gmin</b></td><td>robot szukający dokumentów inwestycji (umowy, aneksy, uchwały)</td></tr>
+<tr><td><b>Pliki</b></td><td>XLSX/XLS/CSV, PDF, DOCX, DOC, ODT, HTML (+ OCR)</td></tr></table></div>
+<div><ul><li>Parser formularzy BZP rozpoznaje pola po etykietach – działa dla wszystkich wersji formularzy i sektorów.</li>
+<li>Każdy rekord: źródło, link, data pobrania, SHA-256, sekcja formularza / strona dokumentu.</li>
+<li>Proces powtarzalny: <code>python -m riskminer build</code>, „Wzbogać ponownie”, „Ponowna analiza”.</li>
+<li>Wielosektorowość: drogi, kubatura, energetyka, kolej – sektor to dane, nie kod.</li></ul></div></div>
+<span class="n">4</span></section>
+
+<section class="s"><div class="bar"></div><h2>Łączenie rekordów: najpierw identyfikator, potem pewność</h2>
+<div class="grid g2"><div><ul>
+<li><b>Numer ogłoszenia BZP</b> (normalizowany) → OCID postępowania → wszystkie ogłoszenia: wynik, zmiany, wykonanie.</li>
+<li>Weryfikacja z danymi podmiotu: <b>NIP</b>, podobieństwo nazwy.</li>
+<li>Numer nieobecny w BZP? Szukamy <b>odwołań</b> do niego w innych ogłoszeniach.</li>
+<li>Projekty KPO: <b>NIP + nazwa + rok naboru + skala</b> → pewność i uzasadnienie; niepewne → ekspert.</li>
+<li>Walidacja: suma kontrolna NIP, format BZP, <b>kod regionu w numerze KPO vs województwo</b>.</li></ul></div>
+<div><div class="box" style="margin-bottom:16px"><b>22 projekty MFiPR</b>: 15 powiązanych po numerze ogłoszenia (pewność 1,0), 1 przez odwołanie w ogłoszeniu o wykonaniu (numer z rekordu nie istnieje w BZP – błąd w danych wykryty), 6 projektów KPO po NIP + nazwie.</div>
+<p style="font-size:18px">Raport z testu łączenia (pewne / niepewne / błędne): <code>docs/raport_testu_laczenia.md</code></p></div></div>
+<span class="n">5</span></section>
+
+<section class="s"><div class="bar"></div><h2>Zdarzenia ryzyka: fakt → przyczyna → skutek → działania → dowód</h2>
+<div class="grid g2"><div><ul>
+<li>Katalog ekspercki <b>R01–R15</b> MFiPR + katalog otwarty: system proponuje nowe kategorie (siła wyższa, waloryzacja, koordynacja).</li>
+<li><b>Fakt</b> z ogłoszenia (zmiana terminu, wypłata ponad umowę, unieważnienie, KIO) + <b>prawdopodobna przyczyna</b> (R-kod).</li>
+<li><b>Skutek</b> w dniach i złotych, <b>działania</b> (zmiana trasy, przewiert, aneks) i ich <b>skuteczność</b> wg wyniku umowy.</li>
+<li>Zmiany administracyjne (rachunek, kierownik budowy) – odfiltrowane.</li></ul></div>
+<div><div class="box">„W trakcie robót ziemnych odkopano niezinwentaryzowany zbiornik bezodpływowy, który kolidował z przebiegiem kanalizacji. Konieczne było skorygowanie trasy…”<br><br>
+<b>R02</b> niedostateczne rozpoznanie stanu istniejącego · <b>R03</b> kolizje · skutek: +30 750 zł · źródło: ogłoszenie 2024/BZP 00426517/01, sekcja 5.4.4 · <span class="tag t2">do weryfikacji eksperta</span></div></div></div>
+<span class="n">6</span></section>
+
+<section class="s"><div class="bar"></div><h2>Raport dla nowej inwestycji</h2>
+<div class="grid" style="grid-template-columns:1.25fr 1fr"><div><img src="img/raport.png" style="max-height:540px;object-fit:cover;object-position:top;width:100%;height:540px"></div>
+<div><ul style="font-size:20px">
+<li>Grupa porównawcza z wyjaśnieniem <b>dlaczego podobna</b> (podsektor, skala, długość, formuła, elementy).</li>
+<li>Prognozy z <b>N i przedziałem 90%</b>; realny czas i koszt końcowy.</li>
+<li><b>Ocena kosztorysu</b>: zł/km vs podobne inwestycje.</li>
+<li>Czerwone flagi, rekomendacje, <b>zapisy umowne</b>, lista kontrolna MFiPR.</li>
+<li><b>Kontakty</b> z gotowym e-mailem – gdy danych mało.</li></ul>
+<p style="font-size:18px"><span class="tag t1">Dane źródłowe</span> <span class="tag t2">Obliczenia</span> <span class="tag t3">Wniosek</span> – zawsze rozróżnione.</p></div></div>
+<span class="n">7</span></section>
+
+<section class="s"><div class="bar"></div><h2>Ekspert w pętli</h2>
+<div class="grid" style="grid-template-columns:1fr 1.2fr"><div><ul>
+<li>Kolejka zdarzeń: <b>zatwierdź / zmień kategorię / odrzuć</b>, komentarz, „wzorcowe”.</li>
+<li>Niepewne powiązania projekt ↔ postępowanie.</li>
+<li>Edycja katalogu ryzyk, wzorców, działań i zapisów umownych – <b>bez programisty</b>.</li>
+<li>Wagi podobieństwa (suwaki), próg „mało danych”.</li>
+<li>Historia decyzji; decyzje wpływają na kolejne analizy i nie są nadpisywane przy ponownej analizie.</li></ul></div>
+<div><img src="img/ekspert.png" style="max-height:520px;width:100%;height:520px;object-fit:cover;object-position:top"></div></div>
+<span class="n">8</span></section>
+
+<section class="s"><div class="bar"></div><h2>Architektura i wdrożenie</h2>
+<div class="grid g3">
+<div class="m"><b style="font-size:28px">0 zależności</b><span>biblioteka standardowa Pythona, SQLite + FTS5, strona bez frameworków; Docker; jeden proces</span></div>
+<div class="m"><b style="font-size:28px">Model wymienny</b><span>none / Ollama (Bielik – lokalnie) / API zgodne z OpenAI (np. Mistral – UE); zmiana w config.toml</span></div>
+<div class="m"><b style="font-size:28px">1–2 s</b><span>analiza nowej inwestycji na 45 tys. postępowań; eksport JSON / CSV / Markdown / PDF</span></div></div>
+<ul style="margin-top:28px"><li>Model danych: projekty, postępowania, ogłoszenia, umowy, zmiany, zdarzenia, dokumenty, źródła, historia decyzji.</li>
+<li>Dane przetwarzane lokalnie; tylko publiczne dane instytucji; rejestr operacji; licencja MIT.</li>
+<li>Skalowanie: reguły, sektory i wagi w bazie; SQLite → PostgreSQL bez zmiany modelu.</li></ul>
+<span class="n">9</span></section>
+
+<section class="s"><div class="bar"></div><h2>Status i dalszy rozwój</h2>
+<div class="grid g2"><div><h3 style="font-size:24px;color:#1d7a4c">Działa</h3><ul style="font-size:19px">
+<li>Budowa bazy z BZP + API, TED, KIO, BIP, NIK, pliki</li><li>Łączenie z walidacją i pewnością, raport z testu łączenia</li>
+<li>Zdarzenia ryzyka z dowodami, katalog otwarty</li><li>Analiza nowej inwestycji, kontakty, eksport</li>
+<li>Panel eksperta, historia, przypadki wzorcowe</li><li>Monitoring trwających postępowań</li></ul></div>
+<div><h3 style="font-size:24px;color:#a96a12">Zaprojektowane / następne kroki</h3><ul style="font-size:19px">
+<li>Pobieranie SWZ/PFU/PPU z platform zakupowych (linki już w bazie)</li><li>Baza Konkurencyjności 2021 (brak publicznego API)</li>
+<li>Model językowy do klasyfikacji zdarzeń „BRAK”</li><li>Integracja z CST2021 i dokumentami MFiPR</li><li>PostgreSQL + wektory dla milionów dokumentów</li></ul></div></div>
+<div class="box" style="margin-top:24px">Uruchomienie: <code>python -m riskminer build</code> · <code>python -m riskminer serve</code> · test jury: <code>python -m riskminer test-run --project P.xlsx --investment O.docx</code></div>
+<span class="n">10</span></section>
+</body></html>

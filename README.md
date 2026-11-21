@@ -17,6 +17,16 @@ python -m riskminer serve      # aplikacja: http://127.0.0.1:8000
 > Działa **bez modelu językowego i bez internetu** (reguły eksperckie + statystyka). Model (lokalny Bielik przez Ollamę albo
 > dowolne API zgodne z OpenAI) można włączyć w `config.toml` – bez zmian w kodzie.
 
+![Raport dla nowej inwestycji](docs/img/raport.png)
+
+**Baza po przetworzeniu kopii BZP wod-kan 2021–2026:** 113 277 ogłoszeń → 45 069 postępowań (23 191 z wynikiem realizacji),
+39 211 umów, 28 631 zmian umów, 57 tys. zdarzeń ryzyka z dowodami, 5 126 zamawiających z danymi kontaktowymi.
+Z 16 600 zakończonych umów wod-kan **35% wykonano po terminie** (średnio 88 dni), w **31% wypłacono więcej niż wartość umowy**,
+a 6 668 postępowań unieważniono, bo oferty przekroczyły budżet.
+
+Materiały: [prezentacja (PDF, 10 slajdów)](docs/prezentacja.pdf) · [architektura](docs/ARCHITEKTURA.md) ·
+[raport z testu łączenia](docs/raport_testu_laczenia.md) · [przykładowe eksporty](docs/przyklady/) · [pliki testowe](examples/)
+
 ---
 
 ## Spis treści (zgodny z treścią zadania MFiPR)
@@ -77,6 +87,11 @@ python -m riskminer test-run --project rekord_projektu.xlsx --investment opis_in
 ---
 
 ## 1. Problem, zakres i scenariusz użytkownika
+
+| Nowa analiza | Panel eksperta | Baza inwestycji |
+|---|---|---|
+| ![](docs/img/analiza.png) | ![](docs/img/ekspert.png) | ![](docs/img/baza.png) |
+
 
 **Problem.** Wiedza o tym, co faktycznie działo się w zrealizowanych inwestycjach, jest rozproszona: ogłoszenia o zamówieniu,
 wyniku, **zmianie umowy** i **wykonaniu umowy** w BZP, TED, orzeczenia KIO, BIP-y gmin, kontrole NIK. Nikt jej nie zbiera, więc

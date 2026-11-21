@@ -199,12 +199,20 @@ def project_markdown(rec: dict[str, Any]) -> str:
         v = p.get(k)
         if k in ("project_value", "grant_value") and v:
             v = fmt_pln(v)
+        if k == "province" and v:
+            from .query import PROVINCES
+            v = PROVINCES.get(v, (v,))[0]
         if k == "subsector":
             v = SUB.get(v, v)
         a(f"- **{lab}:** {v if v not in (None, '') else '—'}")
     a("\n## Walidacja identyfikatorów")
     for v in p.get("validation") or []:
         a(f"- [{v['level']}] {v['field']}: {v['message']}")
+    gaps = (p.get("summary") or {}).get("gaps") or []
+    if gaps:
+        a("\n## Braki w pakiecie danych (brak dokumentu ≠ brak zdarzenia)")
+        for g in gaps:
+            a(f"- [{g['level']}] **{g['item']}** – {g['why']}. Skąd: {g['where']}")
     a("\n## Powiązania ze źródłami (dopasowanie i pewność)")
     a("| Typ | Identyfikator | Nazwa | Podstawa dopasowania | Pewność | Status | Uzasadnienie |\n|---|---|---|---|---|---|---|")
     for l in rec["links"]:
@@ -221,8 +229,9 @@ def project_markdown(rec: dict[str, Any]) -> str:
             a(f"- {n['pub_date']} · {n['notice_type']} · {n['notice_number']} · {n['url']} (pobrano: {n['fetched_at']})")
         a("\n**Umowy:**")
         for c in pr["contracts"]:
-            a(f"- {c.get('contractor')} · umowa {c.get('contract_date')} · wartość {fmt_pln(c.get('contract_value'))} · wykonana: {c.get('executed')} · "
-              f"w terminie: {c.get('on_time')} · należycie: {c.get('properly')} · wypłacono {fmt_pln(c.get('paid_value'))} · zakończenie {c.get('completion_date')}")
+            yn = lambda v: "tak" if v == 1 else "nie" if v == 0 else "b.d."
+            a(f"- {c.get('contractor')} · umowa {c.get('contract_date')} · wartość {fmt_pln(c.get('contract_value'))} · wykonana: {yn(c.get('executed'))} · "
+              f"w terminie: {yn(c.get('on_time'))} · należycie: {yn(c.get('properly'))} · wypłacono {fmt_pln(c.get('paid_value'))} · zakończenie {c.get('completion_date')}")
         if pr["changes"]:
             a("\n**Zmiany umów:**")
             for ch in pr["changes"]:

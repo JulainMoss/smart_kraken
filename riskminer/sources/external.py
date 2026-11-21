@@ -104,6 +104,16 @@ def bip_candidates(www: str | None, email: str | None, org_name: str) -> list[st
     return [("https://" + c) for c in out]
 
 
+def page_is_hit(text: str, keywords: list[str]) -> bool:
+    """To samo kryterium co w robocie – do ponownej oceny zapisanych dokumentów."""
+    place = [fold(k) for k in keywords if k and k[:1].isupper() and len(k) >= 4]
+    generic = [fold(k) for k in keywords if k and not k[:1].isupper() and len(k) >= 4]
+    ft = fold(text)
+    ph = sum(ft.count(k) for k in place)
+    gh = sum(ft.count(k) for k in generic)
+    return (ph >= 1 and gh >= 1) if (place and generic) else (ph >= 2 if place else gh >= 3)
+
+
 def crawl_site(start_urls: list[str], keywords: list[str], max_pages: int = 40, delay: float | None = None,
                progress: Callable[[str], None] | None = None, search_paths: bool = True) -> list[dict]:
     """Przeszukuje serwis (BIP/NIK) od stron startowych, priorytetyzując linki z nawigacją zamówień/inwestycji
@@ -120,7 +130,7 @@ def crawl_site(start_urls: list[str], keywords: list[str], max_pages: int = 40, 
     def score_text(ft: str) -> tuple[int, bool]:
         ph = sum(ft.count(k) for k in place)
         gh = sum(ft.count(k) for k in generic)
-        ok = (ph >= 1 and (gh >= 1 or ph >= 2)) if place else gh >= 3
+        ok = (ph >= 1 and gh >= 1) if (place and generic) else (ph >= 2 if place else gh >= 3)
         return ph * 3 + gh, ok
     seen: set[str] = set()
     queue: list[tuple[float, str, str]] = []
@@ -187,6 +197,7 @@ def crawl_site(start_urls: list[str], keywords: list[str], max_pages: int = 40, 
             if href.startswith(("mailto:", "tel:", "javascript:", "#")):
                 continue
             absu = urllib.parse.urljoin(url, href).split("#")[0]
+            absu = re.sub(r"[?&](fontsize|print|lang|contrast|view)=[^&]*", "", absu)
             if urllib.parse.urlsplit(absu).netloc != domain or absu in seen:
                 continue
             fa = fold(a + " " + href)

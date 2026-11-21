@@ -358,7 +358,7 @@ def enrich_project(conn: sqlite3.Connection, project_id: str, live: bool = True,
             for n in notices:
                 title = ext.ted_title(n)
                 sim, rare = _title_sim(p["title"], title)
-                if sim < 0.2:
+                if sim < 0.35 or not rare:
                     continue
                 pubno = n.get("publication-number")
                 _add_link(conn, project_id, "ted", pubno, title, "TED", f"https://ted.europa.eu/pl/notice/-/detail/{pubno}",
@@ -508,7 +508,8 @@ def analyze_document(conn: sqlite3.Connection, doc_id: str) -> int:
         for sent in split_sentences(text):
             if len(sent) > 700:
                 sent = sent[:700]
-            codes = [c for c in clf.classify_risk(sent, max_codes=1) if c["confidence"] >= 0.62 and c["status"] == "active"]
+            # w dokumentach wymagamy co najmniej dwóch niezależnych sygnałów (mniej fałszywych trafień)
+            codes = [c for c in clf.classify_risk(sent, max_codes=1) if c["confidence"] >= 0.75 and c["status"] == "active"]
             if not codes:
                 continue
             key = (codes[0]["code"], fold(sent)[:80])
@@ -541,7 +542,9 @@ def project_summary(conn: sqlite3.Connection, project_id: str) -> dict[str, Any]
         if e["risk_code"] != "BRAK":
             codes[e["risk_code"]] = codes.get(e["risk_code"], 0) + 1
     main = procs[0] if procs else {}
+    gaps = completeness(conn, project_id, procs)
     return {
+        "gaps": gaps,
         "procedures": len(procs), "contracts": sum(p.get("n_contracts") or 0 for p in procs), "changes": sum(p.get("n_changes") or 0 for p in procs),
         "contract_value": sum(p.get("contract_value") or 0 for p in procs) or None, "paid_value": sum(p.get("paid_value") or 0 for p in procs) or None,
         "cost_change_pct": main.get("cost_change_pct"), "delayed": max((p.get("delayed") or 0 for p in procs), default=None) if procs else None,
@@ -593,3 +596,35 @@ def project_record(conn: sqlite3.Connection, project_id: str) -> dict[str, Any]:
                    (project_id, project_id))
     return {"schema": "riskminer.project_record/1.0", "exported_at": now_iso(), "project": p, "links": links, "procedures": procedures,
             "risk_events": events, "documents": docs, "expert_history": history}
+
+
+def completeness(conn: sqlite3.Connection, project_id: str, procs: list[dict]) -> list[dict[str, str]]:
+    """Braki w pakiecie danych projektu: czego nie ma, dlaczego to ważne i skąd to uzupełnić.
+    Brak dokumentu w pakiecie ≠ brak zdarzenia w inwestycji (zgodnie z materiałem eksperckim MFiPR)."""
+    out = []
+    if not procs:
+        return [{"item": "Postępowanie w BZP", "why": "bez postępowania nie da się odtworzyć przebiegu (umowy, zmiany, wykonanie)",
+                 "where": "BZP / platforma zakupowa zamawiającego; sprawdź numer ogłoszenia lub NIP w rekordzie", "level": "error"}]
+    for p in procs:
+        types = {r[0] for r in conn.execute("SELECT DISTINCT notice_type FROM notices WHERE tender_id=?", (p["tender_id"],))}
+        t = (p.get("title") or "")[:60]
+        if "ContractNotice" not in types:
+            out.append({"item": f"Ogłoszenie o zamówieniu ({t})", "why": "brak szacunku wartości, opisu przedmiotu, okresu realizacji i projektowanych zmian umowy",
+                        "where": "BZP (numer przywołany w ogłoszeniu o wyniku/wykonaniu) lub TED", "level": "warning"})
+        if "TenderResultNotice" not in types:
+            out.append({"item": f"Ogłoszenie o wyniku postępowania ({t})", "why": "brak liczby i cen ofert, wykonawcy i daty umowy",
+                        "where": "BZP", "level": "warning"})
+        if "ContractPerformingNotice" not in types:
+            out.append({"item": f"Ogłoszenie o wykonaniu umowy ({t})", "why": "nie wiadomo, czy umowę wykonano w terminie i należycie oraz ile wypłacono "
+                        "(umowa może być w realizacji – monitoring sprawdzi nowe ogłoszenia)", "where": "BZP (publikacja do 30 dni po wykonaniu umowy)", "level": "info"})
+        if (p.get("n_changes") or 0) > 0 and "AgreementUpdateNotice" not in types:
+            out.append({"item": f"Aneksy / ogłoszenia o zmianie umowy ({t})", "why": "zmiany znane tylko z ogłoszenia o wykonaniu – pełne uzasadnienie bywa w aneksach",
+                        "where": "BIP zamawiającego (rejestr umów), wniosek o informację publiczną", "level": "info"})
+    docs = {r[0] for r in conn.execute("SELECT doc_type FROM documents WHERE project_id=?", (project_id,))}
+    if not docs & {"umowa", "aneks do umowy"}:
+        out.append({"item": "Podpisana umowa z załącznikami", "why": "warunki kontraktowe (kary, zmiany, odbiory) – rzadko publikowana; można odtworzyć z PPU/SWU "
+                    "z oznaczeniem „warunki kontraktowe odtworzone; brak podpisanego egzemplarza umowy”", "where": "BIP (rejestr umów), platforma zakupowa (PPU)", "level": "info"})
+    if not docs & {"SWZ", "PFU"}:
+        out.append({"item": "SWZ / PFU / OPZ", "why": "źródło ryzyk na etapie przygotowania (zakres, wymagania, podział odpowiedzialności)",
+                    "where": f"platforma zakupowa: {procs[0].get('platform_url') or 'adres w ogłoszeniu o zamówieniu'}", "level": "info"})
+    return out
