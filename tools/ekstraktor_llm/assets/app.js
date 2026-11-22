@@ -16,9 +16,17 @@
     {key:"miejscowosc", label:"Miejscowość", c:"#ffb35c"},
     {key:"wojewodztwo", label:"Województwo", c:"#b38cff"},
     {key:"planowana_kwota", label:"Planowana kwota", c:"#e8c25a", wide:false},
-    {key:"planowany_czas", label:"Planowany czas", c:"#ff8fb1", wide:false},
+    {key:"planowany_czas", label:"Planowany czas realizacji", c:"#ff8fb1", wide:true},
   ];
+  // zakres rzeczowy – te same listy co ELEMENTY / JEDNOSTKI_ZAKRESU w serwer.py
+  const ELEM = ["kanalizacja sanitarna grawitacyjna","kanalizacja sanitarna tłoczna","kanalizacja sanitarna (inna/nieokreślona)",
+    "kanalizacja deszczowa","sieć wodociągowa","przyłącza kanalizacyjne","przyłącza wodociągowe","przepompownia ścieków",
+    "oczyszczalnia ścieków","stacja uzdatniania wody","zbiornik","studnia głębinowa","studnie/studzienki",
+    "urządzenia i wyposażenie","nawierzchnie i drogi","inne"];
+  const UNITS = ["km","m","szt.","m2","m3","m3/d","RLM","kW","inne"];
+  const SCOPE_C = "#7fe0d0";
 
+  const APP_VERSION = "2026-11-22.5";   // ta sama co VERSION w serwer.py
   const S = { result:null, text:"", meta:null, ctrl:null, timer:null, status:null };
 
   // ---- pomocnicze ----------------------------------------------------------
@@ -39,20 +47,26 @@
   async function checkStatus(){
     const el = $("status");
     try{
-      const s = await (await fetch("api/status")).json(); S.status = s;
+      const s = await (await fetch("api/status")).json(); S.status = s; updateChars();
+      if(s.wersja !== APP_VERSION){
+        banner(`Serwer aplikacji działa w starszej wersji (${esc(s.wersja || "sprzed 21.11 22:55")}), a strona jest nowsza (${APP_VERSION}).
+          Zatrzymaj serwer (Ctrl+C w jego oknie) i uruchom ponownie <code>python serwer.py</code>, potem odśwież stronę (Ctrl+F5).`, "err");
+        S.staleServer = true; $("btnAnalyze").disabled = true; $("btnAnalyze").title = "Serwer działa w starszej wersji – uruchom go ponownie";
+      }
       el.className = "status " + (s.model_ready ? "ok" : s.online ? "warn" : "bad");
       $("statusText").textContent = s.model_ready ? `${s.model} · gotowy`
         : s.online ? `Brak modelu ${s.model}` : `Serwer modelu nie działa (${s.backend})`;
       el.title = s.model_ready ? `Model ${s.model} na ${s.url} (${s.backend})`
         : s.online ? `Pobierz model poleceniem: ollama pull ${s.model}\nDostępne: ${s.models.join(", ") || "brak"}`
         : `Nie można połączyć z ${s.url}. Uruchom Ollamę (ollama serve) albo inny serwer modelu.`;
-      if(!s.model_ready && !S.result){
+      if(S.staleServer){ /* komunikat o starym serwerze ma pierwszeństwo */ }
+      else if(!s.model_ready && !S.result){
         banner(s.online
           ? `Lokalny serwer modelu działa, ale nie ma na nim modelu <b>${esc(s.model)}</b>. Pobierz go:<br><code>ollama pull ${esc(s.model)}</code><br>
              <small>Albo uruchom serwer z innym modelem: <code>python serwer.py --model NAZWA</code>. Dostępne: ${esc(s.models.join(", ") || "brak")}</small>`
           : `Nie ma połączenia z lokalnym modelem (${esc(s.url)}). Zainstaluj <a href="https://ollama.com/download" target="_blank" rel="noopener">Ollamę</a>, a potem:<br>
              <code>ollama pull ${esc(s.model)}</code>`, "warn");
-      } else if(s.model_ready && !S.result) banner("");
+      } else if(s.model_ready && !S.result && !S.staleServer) banner("");
       return s;
     }catch{
       el.className = "status bad"; $("statusText").textContent = "Brak połączenia z serwer.py";
@@ -63,10 +77,12 @@
 
   // ---- analiza ---------------------------------------------------------------
   async function analyze(){
+    if(S.staleServer){ toast("Najpierw uruchom ponownie serwer (python serwer.py) – działa starsza wersja."); return; }
     const text = $("text").value.trim();
     if(text.length < 20){ toast("Wpisz dłuższy opis inwestycji."); $("text").focus(); return; }
     if(S.ctrl) return;
     S.ctrl = new AbortController();
+    S.reqId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()).replace(/[^\w-]/g, "");
     const t0 = Date.now();
     const btn = $("btnAnalyze"); btn.disabled = true; $("btnCancel").hidden = false;
     const tick = () => { btn.innerHTML = `<span class="spinner"></span> Analizuję… ${Math.round((Date.now()-t0)/1000)} s`; };
@@ -75,14 +91,14 @@
     $("result").innerHTML = `<div class="fields">${FIELDS.map(()=>`<div class="skel"></div>`).join("")}</div><div class="skel" style="margin-top:12px;height:90px"></div>
       <p class="muted" style="font-size:12.5px;margin-top:10px">Model czyta tekst – na komputerze bez karty graficznej może to potrwać od kilkunastu sekund do kilku minut.</p>`;
     try{
-      const r = await fetch("api/extract", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({text}), signal:S.ctrl.signal});
+      const r = await fetch("api/extract", {method:"POST", headers:{"Content-Type":"application/json", "X-Request-Id":S.reqId}, body:JSON.stringify({text}), signal:S.ctrl.signal});
       const j = await r.json().catch(() => ({title:`HTTP ${r.status}`}));
       if(!r.ok) throw Object.assign(new Error(j.title || `HTTP ${r.status}`), {detail:j.detail, debug:j.debug_plik, raw:j.surowa_tresc});
       S.text = text; S.result = j.wynik; S.meta = j;
       render(); showMarked();
       if(j.ostrzezenia?.length) banner(j.ostrzezenia.map(esc).join("<br>"), "warn");
     }catch(e){
-      if(e.name === "AbortError"){ banner("Analizę przerwano.", "warn"); }
+      if(e.name === "AbortError"){ banner("Analizę przerwano – model zatrzymany.", "warn"); }
       else banner(`<b>${esc(e.message)}</b>${e.detail?`<br><small>${esc(String(e.detail).slice(0,400))}</small>`:""}` +
         (e.debug ? `<br><small>Zapis debug: <code>${esc(e.debug)}</code></small>` : "") + rawBox(e.raw), "err");
       if(!S.result) $("result").innerHTML = ""; else render();
@@ -95,8 +111,9 @@
 
   // ---- wynik ------------------------------------------------------------------
   function srcBadge(f, key){
-    const val = key==="planowana_kwota" ? f.kwota!=null : key==="planowany_czas" ? (f.liczba!=null || f.termin_do) : !!f.wartosc;
+    const val = key==="planowana_kwota" ? f.kwota!=null : key==="planowany_czas" ? (f.liczba!=null || f.termin_do || f.data_podpisania) : !!f.wartosc;
     if(!val) return `<span class="src none">nie znaleziono</span>`;
+    if(f.z_reguly === true) return `<span class="src inf" title="Model nie podał poprawnej wartości – odczytano z tekstu regułą (np. etykieta „Zamawiający:”)">z tekstu (reguła)</span>`;
     if(key==="wojewodztwo" && f.wywnioskowane && f.zrodlo==="brak") return `<span class="src inf" title="Nie pada w tekście – model wywnioskował z miejscowości lub zamawiającego">wywnioskowane</span>`;
     if(f.zrodlo==="dokladny") return `<span class="src ok" title="Cytat znaleziony w tekście">✓ w tekście</span>`;
     if(f.zrodlo==="czesciowy") return `<span class="src part" title="Cytat zgadza się z tekstem tylko częściowo">≈ w tekście</span>`;
@@ -118,9 +135,13 @@
           <select data-k="${key}" data-p="vat" style="flex:1.3">${["nieokreślone","netto","brutto"].map(v=>`<option${v===f.vat?" selected":""}>${v}</option>`).join("")}</select></div>
           <div class="pretty" data-pretty="${key}"></div>`;
       case "planowany_czas":
-        return `<div class="row"><input data-k="${key}" data-p="liczba" data-num="1" value="${f.liczba??""}" placeholder="liczba" style="flex:1">
-          <select data-k="${key}" data-p="jednostka" style="flex:1.3">${opts(JEDN, f.jednostka, "jednostka")}</select>
-          <input type="date" data-k="${key}" data-p="termin_do" value="${esc(f.termin_do)}" title="termin zakończenia" style="flex:1.5"></div>
+        return `<div class="row time-row">
+            <label class="mini">Czas trwania<span class="row"><input data-k="${key}" data-p="liczba" data-num="1" value="${f.liczba??""}" placeholder="np. 20" style="flex:1">
+              <select data-k="${key}" data-p="jednostka" style="flex:1.4">${opts(JEDN, f.jednostka, "jednostka")}</select></span></label>
+            <label class="mini">Podpisanie umowy<input type="date" data-k="${key}" data-p="data_podpisania" value="${esc(f.data_podpisania)}"></label>
+            <label class="mini">Termin zakończenia<input type="date" data-k="${key}" data-p="termin_do" value="${esc(f.termin_do)}"></label>
+            <label class="mini">Termin pierwotny<input type="date" data-k="${key}" data-p="termin_pierwotny" value="${esc(f.termin_pierwotny)}" title="wcześniejszy termin, jeśli został zmieniony (aneks, przedłużenie)"></label>
+          </div>
           <div class="pretty" data-pretty="${key}"></div>`;
     }
   }
@@ -130,18 +151,96 @@
       return f.kwota!=null ? `<b>${esc(fmtMoney(f.kwota, f.waluta))}</b> ${f.vat!=="nieokreślone"?esc(f.vat):"<span class='muted'>(VAT nieokreślony)</span>"}` : "";
     }
     if(key==="planowany_czas"){
-      const n = f.liczba, u = f.jednostka; const parts = [];
-      if(n!=null && u){
-        const days = Math.round(n * {dni:1,tygodnie:7,"miesiące":30.4375,lata:365.25}[u]); f.dni = days;
-        parts.push(`<b>${esc(String(n).replace(".",","))} ${esc(plUnit(n, u))}</b> ≈ ${days.toLocaleString("pl-PL")} ${plDays(days)}` + (u!=="miesiące" && days>=60 ? ` (${(days/30.4375).toFixed(1).replace(".",",")} ${plMonths(days/30.4375)})` : ""));
-      } else if(f.termin_do){
-        const days = Math.round((new Date(f.termin_do) - new Date(new Date().toISOString().slice(0,10)))/864e5); f.dni = days;
-        parts.push(`${days>=0?"zostało":"minęło"} ${Math.abs(days).toLocaleString("pl-PL")} ${plDays(Math.abs(days))}`);
-      } else f.dni = null;
-      if(f.termin_do) parts.push(`termin: <b>${f.termin_do.split("-").reverse().join(".")}</b>`);
-      return parts.join(" · ");
+      computeTime(f);
+      const d = x => x ? x.split("-").reverse().join(".") : "";
+      const lines = [];
+      if(f.dni != null){
+        const dur = f.liczba!=null && f.jednostka ? ` (${esc(String(f.liczba).replace(".",","))} ${esc(plUnit(f.liczba, f.jednostka))})` : "";
+        const end = f.termin_do || f.termin_wyliczony;
+        lines.push(`<b>${f.dni.toLocaleString("pl-PL")} ${plDays(Math.abs(f.dni))}</b>${dur}` +
+          (f.data_podpisania && end ? ` · od podpisania <b>${d(f.data_podpisania)}</b> do <b>${d(end)}</b>${f.termin_do ? "" : " <span class='muted'>(wyliczony)</span>"}` :
+           end ? ` · do <b>${d(end)}</b>` : "") +
+          `<br><span class="muted">${esc(f.podstawa)}</span>`);
+      }
+      if(f.przedluzenie_dni != null) lines.push(`<span class="${f.przedluzenie_dni>0?"warn-t":""}">Termin zmieniony z ${d(f.termin_pierwotny)} na ${d(f.termin_do)}: <b>${f.przedluzenie_dni>0?"+":""}${f.przedluzenie_dni} ${plDays(Math.abs(f.przedluzenie_dni))}</b></span>`);
+      if(f.uwaga) lines.push(`<span class="warn-t">⚠ ${esc(f.uwaga)}</span>`);
+      return lines.join("<br>");
     }
     return "";
+  }
+
+  // ---- czas realizacji: to samo co compute_time() w serwer.py (przeliczane po każdej poprawce) ----
+  const toD = x => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(x || ""); return m ? new Date(Date.UTC(+m[1], +m[2]-1, +m[3])) : null; };
+  const iso = d => d ? d.toISOString().slice(0,10) : "";
+  const days = (a, b) => Math.round((b - a) / 864e5);
+  function addDuration(start, n, u){
+    const d = new Date(start);
+    if(u==="dni"){ d.setUTCDate(d.getUTCDate() + Math.round(n)); return d; }
+    if(u==="tygodnie"){ d.setUTCDate(d.getUTCDate() + Math.round(n*7)); return d; }
+    const months = u==="lata" ? n*12 : n, whole = Math.trunc(months), day = d.getUTCDate();
+    d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + whole);
+    const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth()+1, 0)).getUTCDate();
+    d.setUTCDate(Math.min(day, last)); d.setUTCDate(d.getUTCDate() + Math.round((months-whole)*30.4375));
+    return d;
+  }
+  function computeTime(f){
+    const sign = toD(f.data_podpisania), end = toD(f.termin_do), orig = toD(f.termin_pierwotny);
+    const hasDur = f.liczba != null && f.jednostka;
+    const calc = sign && hasDur ? addDuration(sign, f.liczba, f.jednostka) : null;
+    f.termin_wyliczony = iso(calc); f.dni = null; f.podstawa = ""; f.przedluzenie_dni = null; f.uwaga = "";
+    const koniec = end || calc;
+    if(sign && koniec){ f.dni = days(sign, koniec); f.podstawa = "od podpisania umowy do " + (end ? "terminu zakończenia" : "terminu wyliczonego z czasu trwania"); }
+    else if(hasDur){ f.dni = Math.round(f.liczba * {dni:1,tygodnie:7,"miesiące":30.4375,lata:365.25}[f.jednostka]); f.podstawa = "z czasu trwania (brak daty podpisania umowy)"; }
+    else if(end){ f.dni = days(toD(new Date().toISOString().slice(0,10)), end); f.podstawa = "od dziś do terminu zakończenia (brak daty podpisania umowy)"; }
+    if(end && orig) f.przedluzenie_dni = days(orig, end);
+    const explained = orig && calc && Math.abs(days(calc, orig)) <= 15;   // różnicę tłumaczy przedłużenie terminu
+    if(end && calc && Math.abs(days(calc, end)) > 15 && !explained) f.uwaga = `Termin zakończenia (${iso(end)}) różni się o ${Math.abs(days(calc, end))} dni od wyliczonego z czasu trwania (${iso(calc)}).`;
+    if(f.dni != null && f.dni < 0 && sign) f.uwaga = "Termin zakończenia jest wcześniejszy niż data podpisania umowy – sprawdź daty.";
+  }
+
+  // ---- zakres rzeczowy ----------------------------------------------------------
+  function scopeBase(it){
+    const v = it.ilosc;
+    if(v == null || Number.isNaN(v)){ it.ilosc_bazowa = null; it.jednostka_bazowa = it.jednostka; return; }
+    if(it.jednostka === "km"){ it.ilosc_bazowa = Math.round(v*1000*1000)/1000; it.jednostka_bazowa = "m"; }
+    else { it.ilosc_bazowa = v; it.jednostka_bazowa = it.jednostka; }
+  }
+  function scopeTotals(){
+    const tot = {};
+    for(const it of S.result.zakres_rzeczowy || []){
+      scopeBase(it); if(it.ilosc_bazowa == null) continue;
+      const d = tot[it.element] ||= {}; d[it.jednostka_bazowa] = Math.round(((d[it.jednostka_bazowa] || 0) + it.ilosc_bazowa) * 1000) / 1000;
+    }
+    S.result.zakres_suma = tot; return tot;
+  }
+  const fmtN = v => v == null ? "" : v.toLocaleString("pl-PL", {maximumFractionDigits:3});
+  function scopeHtml(){
+    const items = S.result.zakres_rzeczowy || [];
+    const rows = items.map((it, i) => {
+      const flag = !it.cytat ? `<span class="src none" title="Pozycja dodana ręcznie albo bez cytatu">bez cytatu</span>`
+        : (it.zrodlo === "brak" || it.liczba_w_cytacie === false) ? `<span class="src part" title="${it.liczba_w_cytacie===false ? "Liczba nie występuje w cytacie" : "Cytatu nie ma w tekście"} – sprawdź">sprawdź</span>`
+        : `<span class="src ok">✓</span>`;
+      const extra = (it.z_reguly ? ` <span class="src rule" title="Model pominął tę pozycję – znaleziona w tekście regułą (liczba + jednostka + opis)">z tekstu (reguła)</span>` : "")
+        + (it.poprawka ? ` <span class="src part" title="${esc(it.poprawka)}">jedn. poprawiona</span>` : "");
+      return `<tr>
+        <td><select data-scope="${i}" data-p="element">${ELEM.map(e => `<option${e===it.element?" selected":""}>${esc(e)}</option>`).join("")}</select>
+          ${it.opis && it.opis !== it.element ? `<div class="muted small">${esc(it.opis)}</div>` : ""}</td>
+        <td><input data-scope="${i}" data-p="ilosc" data-num="1" value="${it.ilosc ?? ""}" class="num"></td>
+        <td><select data-scope="${i}" data-p="jednostka">${UNITS.map(u => `<option${u===it.jednostka?" selected":""}>${u}</option>`).join("")}</select></td>
+        <td><input data-scope="${i}" data-p="parametry" value="${esc(it.parametry || "")}" placeholder="np. DN 200, PVC"></td>
+        <td class="q">${flag}${extra} ${it.cytat ? `<span class="quote ${it.span?"":"nolink"}" data-span="${it.span ? it.span.join(",") : ""}">${esc(it.cytat)}</span>` : ""}</td>
+        <td><button type="button" class="x" data-sdel="${i}" title="Usuń pozycję">×</button></td></tr>`;
+    }).join("");
+    return `<div class="scope-box" style="--c:${SCOPE_C}"><div class="lab">Zakres rzeczowy w liczbach <span class="muted" style="text-transform:none;letter-spacing:0">(${items.length})</span></div>
+      ${items.length ? `<div class="scope-wrap"><table class="scope"><thead><tr><th>Element</th><th>Ilość</th><th>Jedn.</th><th>Parametry</th><th>Źródło</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
+        : `<p class="muted small" style="margin:4px 0 8px">Model nie znalazł w tekście ilości (długości, sztuk, powierzchni…). Możesz dodać je ręcznie.</p>`}
+      <div class="scope-sum" id="scopeSum">${scopeSumHtml()}</div>
+      <button type="button" class="ghost small" id="scopeAdd">+ Dodaj pozycję</button></div>`;
+  }
+  function scopeSumHtml(){
+    const tot = scopeTotals(), parts = [];
+    for(const [el, units] of Object.entries(tot)) for(const [u, v] of Object.entries(units)) parts.push(`${esc(el)}: <b>${fmtN(v)} ${esc(u)}</b>`);
+    return parts.length ? "Razem (w jednostkach bazowych, km → m): " + parts.join(" · ") : "";
   }
 
   function render(){
@@ -149,16 +248,19 @@
     $("btnCopy").disabled = $("btnDownload").disabled = false;
     const cards = FIELDS.map(F => {
       const f = r[F.key] || {};
-      const hasVal = F.key==="planowana_kwota" ? f.kwota!=null : F.key==="planowany_czas" ? (f.liczba!=null||f.termin_do) : !!f.wartosc;
-      return `<div class="field ${hasVal?"":"empty-val"}" style="--c:${F.c}">
+      const hasVal = F.key==="planowana_kwota" ? f.kwota!=null : F.key==="planowany_czas" ? (f.liczba!=null||f.termin_do||f.data_podpisania) : !!f.wartosc;
+      return `<div class="field ${hasVal?"":"empty-val"} ${F.wide?"wide":""}" style="--c:${F.c}">
         <div class="lab">${F.label}${srcBadge(f, F.key)}</div>
         ${fieldBody(F.key, f)}
         ${f.cytat ? `<div class="quote ${f.span?"":"nolink"}" data-span="${f.span?f.span.join(","):""}" title="${f.span?"Pokaż w tekście":"Cytatu nie znaleziono dosłownie w tekście"}">${esc(f.cytat)}</div>` : ""}
+        ${notesHtml(F.key, f)}
       </div>`;
     }).join("");
     const kws = r.slowa_kluczowe || [];
     const usedCats = [...new Set(kws.map(k=>k.kategoria))];
+    S.result.zakres_rzeczowy ||= [];
     $("result").innerHTML = `<div class="fields">${cards}</div>
+      ${scopeHtml()}
       <div class="kw-box"><div class="lab">Słowa kluczowe inwestycji <span class="muted" style="text-transform:none;letter-spacing:0">(${kws.length})</span></div>
         <div class="chips" id="chips">${chipsHtml()}</div>
         <div class="legend">${usedCats.map(c=>`<span style="--c:${KAT[c]||KAT.inne}">${esc(c)}</span>`).join("")}</div>
@@ -169,7 +271,17 @@
     if(m) $("meta").innerHTML = `Model <b>${esc(m.model)}</b> (${esc(m.backend)}) · ${m.czas_s} s` +
       (m.statystyki?.tokens_in ? ` · tokeny: ${m.statystyki.tokens_in} → ${m.statystyki.tokens_out}` : "") +
       ` · ${m.dlugosc_tekstu.toLocaleString("pl-PL")} znaków. Pola można poprawić – eksport zawiera poprawione wartości.` +
+      (m.wynik_plik ? `<br>Zapisano wynik: <code>${esc(m.wynik_plik)}</code>` : "") +
       (m.debug_plik ? `<br>Zapis debug: <code>${esc(m.debug_plik)}</code>` : "") + rawBox(m.surowa_tresc);
+  }
+  // uwagi weryfikacji: co odrzucono z odpowiedzi modelu i co uzupełniono regułą z tekstu
+  const RULE_LABEL = {data_podpisania:"data podpisania umowy", termin_pierwotny:"termin pierwotny", termin_do:"nowy termin zakończenia"};
+  function notesHtml(key, f){
+    const out = [];
+    if(f.odrzucone) out.push(`<div class="rej" title="Odpowiedź modelu nie przeszła weryfikacji z tekstem">✕ Odrzucono odpowiedź modelu: „${esc(f.odrzucone.wartosc)}” – ${esc(f.odrzucone.powod)}</div>`);
+    if(Array.isArray(f.z_reguly) && f.z_reguly.length) out.push(`<div class="rule">↳ Uzupełniono z tekstu regułą: ${f.z_reguly.map(x => esc(RULE_LABEL[x] || x)).join(", ")}</div>`);
+    if(key === "wojewodztwo" && f.wywnioskowane && f.wartosc) out.push(`<div class="rule">Województwo nie pada w tekście – to wniosek modelu, sprawdź je.</div>`);
+    return out.join("");
   }
   // surowa odpowiedź modelu (debug)
   function rawBox(content){
@@ -188,6 +300,7 @@
     const r = S.result, t = S.text; if(!r) return;
     const spans = [];
     FIELDS.forEach(F => { const s = r[F.key]?.span; if(s) spans.push({a:s[0], b:s[1], c:F.c, label:F.label, cls:""}); });
+    (r.zakres_rzeczowy||[]).forEach(z => { if(z.span) spans.push({a:z.span[0], b:z.span[1], c:SCOPE_C, label:`${z.element}: ${z.ilosc} ${z.jednostka}`, cls:""}); });
     (r.slowa_kluczowe||[]).forEach(k => { if(k.span) spans.push({a:k.span[0], b:k.span[1], c:KAT[k.kategoria]||KAT.inne, label:k.fraza, cls:"kw"}); });
     spans.sort((x,y) => x.a-y.a || (y.b-y.a)-(x.b-x.a));
     let out = "", pos = 0;
@@ -209,7 +322,13 @@
 
   // ---- edycja wyników --------------------------------------------------------
   $("result").addEventListener("input", e => {
-    const el = e.target; const k = el.dataset.k, p = el.dataset.p; if(!k || !S.result) return;
+    const el = e.target;
+    if(el.dataset.scope != null && S.result){
+      const it = S.result.zakres_rzeczowy[+el.dataset.scope]; let v = el.value;
+      if(el.dataset.num){ v = v.trim()==="" ? null : Number(v.replace(/\s/g,"").replace(",", ".")); if(Number.isNaN(v)) return; }
+      it[el.dataset.p] = v; $("scopeSum").innerHTML = scopeSumHtml(); return;
+    }
+    const k = el.dataset.k, p = el.dataset.p; if(!k || !S.result) return;
     let v = el.value;
     if(el.dataset.num){ v = v.trim()==="" ? null : Number(String(v).replace(/\s/g,"").replace(",", ".")); if(Number.isNaN(v)) return; }
     S.result[k][p] = v;
@@ -223,7 +342,15 @@
     if(del){ S.result.slowa_kluczowe.splice(+del.dataset.del, 1); $("chips").innerHTML = chipsHtml(); showMarked(); return; }
     const chip = e.target.closest(".chip.link"); if(chip){ const k = S.result.slowa_kluczowe[+chip.dataset.i]; if(k?.span) flash(k.span[0]); return; }
     if(e.target.id === "kwAdd") addKw();
+    const sdel = e.target.closest("[data-sdel]");
+    if(sdel){ S.result.zakres_rzeczowy.splice(+sdel.dataset.sdel, 1); rerenderScope(); showMarked(); return; }
+    if(e.target.id === "scopeAdd"){
+      S.result.zakres_rzeczowy.push({element:"inne", opis:"", ilosc:null, jednostka:"m", parametry:"", cytat:"", span:null});
+      rerenderScope(); document.querySelector(`[data-scope="${S.result.zakres_rzeczowy.length-1}"][data-p="element"]`)?.focus();
+    }
   });
+  function rerenderScope(){ const box = document.querySelector(".scope-box"); if(box) box.outerHTML = scopeHtml(); }
+  $("result").addEventListener("change", e => { if(e.target.tagName === "SELECT" || e.target.type === "date") e.target.dispatchEvent(new Event("input", {bubbles:true})); });
   $("result").addEventListener("keydown", e => { if(e.target.id==="kwNew" && e.key==="Enter"){ e.preventDefault(); addKw(); } });
   function addKw(){
     const fr = $("kwNew").value.trim(); if(!fr) return;
@@ -245,8 +372,13 @@
       wojewodztwo_kod: r.wojewodztwo.wartosc ? "PL" + String((WOJ.indexOf(r.wojewodztwo.wartosc)+1)*2).padStart(2,"0") : null,
       wojewodztwo_wywnioskowane: !!r.wojewodztwo.wywnioskowane,
       planowana_kwota: r.planowana_kwota.kwota!=null ? {kwota:r.planowana_kwota.kwota, waluta:r.planowana_kwota.waluta||"PLN", vat:r.planowana_kwota.vat} : null,
-      planowany_czas: (r.planowany_czas.liczba!=null || r.planowany_czas.termin_do) ? {liczba:r.planowany_czas.liczba, jednostka:r.planowany_czas.jednostka||null,
-        termin_do:r.planowany_czas.termin_do||null, dni:r.planowany_czas.dni ?? null} : null,
+      planowany_czas: (c => (c.liczba!=null || c.termin_do || c.data_podpisania) ? (computeTime(c), {
+        liczba:c.liczba, jednostka:c.jednostka||null, data_podpisania:c.data_podpisania||null, termin_do:c.termin_do||null,
+        termin_wyliczony:c.termin_wyliczony||null, termin_pierwotny:c.termin_pierwotny||null, przedluzenie_dni:c.przedluzenie_dni,
+        dni:c.dni ?? null, podstawa:c.podstawa||null, uwaga:c.uwaga||null}) : null)(r.planowany_czas),
+      zakres_rzeczowy: (r.zakres_rzeczowy||[]).filter(z => z.ilosc != null).map(z => (scopeBase(z), {element:z.element, opis:z.opis||null,
+        ilosc:z.ilosc, jednostka:z.jednostka, ilosc_bazowa:z.ilosc_bazowa, jednostka_bazowa:z.jednostka_bazowa, parametry:z.parametry||null, cytat:z.cytat||null})),
+      zakres_suma: scopeTotals(),
       slowa_kluczowe: (r.slowa_kluczowe||[]).map(k => ({fraza:k.fraza, kategoria:k.kategoria})),
       cytaty: Object.fromEntries(FIELDS.map(F => [F.key, r[F.key]?.cytat || null])),
       model: S.meta?.model, data_analizy: new Date().toISOString(),
@@ -261,14 +393,55 @@
   });
 
   // ---- wejście: plik, przykład, skróty ------------------------------------------
+  // .txt/.md/.csv/.html czyta przeglądarka; .pdf/.docx/.odt – serwer (api/file), lokalnie, bez wysyłania w świat
+  const TEXT_EXT = ["txt","md","csv","html","htm"], SERVER_EXT = ["pdf","docx","odt"];
+  // udział „dziwnych” znaków – krzaki z czcionek PDF, dane binarne czytane jako tekst
+  function garbledRatio(t){
+    const sample = (t || "").slice(0, 20000); if(!sample.trim()) return 1;
+    const odd = (sample.match(/[\uE000-\uF8FF\uFFFD\x00-\x08\x0B\x0C\x0E-\x1F]|\(cid:\d+\)/g) || []).join("").length;
+    const ok = (sample.match(/[\p{L}\p{N}\s.,;:!?()\[\]{}"'„”«»\-–—\/\\%&*+=<>#@§|°€$~^`]/gu) || []).length;
+    return Math.max(odd / sample.length, 1 - ok / sample.length);
+  }
   async function readFile(file){
     if(!file) return;
-    if(file.size > 3e6){ toast("Plik jest za duży (maks. 3 MB tekstu)."); return; }
-    const buf = await file.arrayBuffer();
-    let txt = new TextDecoder("utf-8").decode(buf);
-    if(txt.includes("�")){ try{ txt = new TextDecoder("windows-1250").decode(buf); }catch{} }   // polskie pliki z Windows
-    if(/\.html?$/i.test(file.name)){ const d = new DOMParser().parseFromString(txt, "text/html"); d.querySelectorAll("script,style").forEach(n=>n.remove()); txt = d.body.innerText || d.body.textContent; }
-    $("text").value = txt.trim(); updateChars(); showEditor(); saveDraft(); toast(`Wczytano: ${file.name}`);
+    const ext = (file.name.split(".").pop() || "").toLowerCase();
+    if(ext === "doc"){ toast("Stary format Word (.doc) nie jest obsługiwany – zapisz plik jako .docx."); return; }
+    if(![...TEXT_EXT, ...SERVER_EXT].includes(ext)){ toast(`Nieobsługiwany typ pliku (.${ext}). Obsługiwane: PDF, DOCX, ODT, TXT, MD, CSV, HTML.`); return; }
+    let txt, info = "";
+    if(SERVER_EXT.includes(ext)){
+      if(file.size > 30e6){ toast("Plik jest za duży (maks. 30 MB)."); return; }
+      const lab = document.querySelector('label[for="fileInput"]'), old = lab.textContent;
+      lab.innerHTML = `<span class="spinner" style="border-color:var(--line2);border-top-color:var(--acc)"></span> Czytam ${ext.toUpperCase()}…`; lab.title = "Skany PDF są rozpoznawane przez OCR – to może potrwać kilka sekund na stronę";
+      try{
+        const r = await fetch("api/file", {method:"POST", headers:{"X-Filename": encodeURIComponent(file.name), "Content-Type":"application/octet-stream"}, body:file});
+        const j = await r.json().catch(() => ({title:`HTTP ${r.status}`}));
+        if(!r.ok){ banner(`<b>Nie udało się wczytać pliku ${esc(file.name)}</b><br>${esc(j.title || "")}${j.detail?`<br><small>${esc(j.detail)}</small>`:""}`, "err"); return; }
+        txt = j.tekst;
+        info = (j.strony ? `${j.strony} ${j.strony===1?"strona":(j.strony%10>=2&&j.strony%10<=4&&(j.strony%100<10||j.strony%100>=20))?"strony":"stron"}, ` : "") + `${j.znaki.toLocaleString("pl-PL")} znaków`;
+        const notes = [...(j.ostrzezenia || [])];
+        if(j.ocr) notes.unshift(`Ten PDF to obraz strony – tekst rozpoznano przez OCR${j.ocr_strony ? ` (pierwsze ${j.ocr_strony} stron)` : ""}. Sprawdź go przed analizą: OCR może pomylić litery, liczby i kwoty.`);
+        banner(notes.length ? notes.map(esc).join("<br>") : "", "warn");
+        if(j.ocr) info = "OCR, " + info;
+      }catch{
+        banner("Nie udało się wysłać pliku do serwera aplikacji. Czy działa <code>python serwer.py</code>?", "err"); return;
+      }finally{ lab.textContent = old; }
+    } else {
+      if(file.size > 3e6){ toast("Plik jest za duży (maks. 3 MB tekstu)."); return; }
+      const buf = await file.arrayBuffer();
+      txt = new TextDecoder("utf-8").decode(buf);
+      if(txt.includes("\uFFFD")){ try{ txt = new TextDecoder("windows-1250").decode(buf); }catch{} }   // polskie pliki z Windows
+      if(/^html?$/.test(ext)){ const d = new DOMParser().parseFromString(txt, "text/html"); d.querySelectorAll("script,style").forEach(n=>n.remove()); txt = d.body.innerText || d.body.textContent; }
+      txt = txt.trim();
+    }
+    const bad = garbledRatio(txt);
+    if(bad > 0.1){
+      banner(`<b>Tekst z pliku ${esc(file.name)} wygląda na nieczytelny</b> (${Math.round(bad*100)}% nietypowych znaków), więc nie został wczytany.
+        ${TEXT_EXT.includes(ext) ? "Plik ma rozszerzenie tekstowe, ale zawiera dane binarne – sprawdź, czy to na pewno plik tekstowy." :
+          "Otwórz plik, zaznacz tekst i wklej go do pola. Jeśli skopiowany tekst też jest nieczytelny, dokument jest skanem lub ma czcionki bez mapowania liter – potrzebne OCR."}`, "err");
+      return;
+    }
+    $("text").value = txt; updateChars(); showEditor(); saveDraft();
+    toast(`Wczytano: ${file.name}${info ? ` (${info})` : ""}`);
   }
   $("fileInput").addEventListener("change", e => { readFile(e.target.files[0]); e.target.value = ""; });
   const wrap = document.querySelector(".editor-wrap");
@@ -285,8 +458,18 @@ Ryzyka: kolizje z istniejącą siecią gazową, wysoki poziom wód gruntowych w 
   $("btnClear").addEventListener("click", () => { $("text").value = ""; updateChars(); showEditor(); saveDraft(); });
   $("btnEdit").addEventListener("click", showEditor);
   $("btnAnalyze").addEventListener("click", analyze);
-  $("btnCancel").addEventListener("click", () => S.ctrl?.abort());
-  function updateChars(){ const n = $("text").value.length; $("chars").textContent = `${n.toLocaleString("pl-PL")} znaków`; }
+  // „Przerwij”: serwer zamyka połączenie z modelem, więc Ollama przestaje liczyć (wentylatory cichną)
+  $("btnCancel").addEventListener("click", () => {
+    if(S.reqId) fetch("api/cancel", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({id:S.reqId})}).catch(()=>{});
+    S.ctrl?.abort();
+  });
+  function updateChars(){
+    const n = $("text").value.length, max = S.status?.max_znakow, el = $("chars");
+    el.textContent = `${n.toLocaleString("pl-PL")}${max ? " / ~" + max.toLocaleString("pl-PL") : ""} znaków`;
+    el.style.color = max && n > max ? "var(--warn)" : "";
+    el.title = max ? (n > max ? `Model zmieści ok. ${max.toLocaleString("pl-PL")} znaków (okno ${S.status.ctx} tokenów) – reszta zostanie pominięta.` :
+      `Limit wynika z okna kontekstu modelu (${S.status.ctx} tokenów).`) : "";
+  }
   $("text").addEventListener("input", () => { updateChars(); clearTimeout(saveDraft._t); saveDraft._t = setTimeout(saveDraft, 400); });
   document.addEventListener("keydown", e => { if((e.ctrlKey||e.metaKey) && e.key==="Enter"){ e.preventDefault(); analyze(); } });
 

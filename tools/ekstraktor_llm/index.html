@@ -26,17 +26,18 @@
       <div class="head-actions">
         <button type="button" class="ghost" id="btnExample">Przykład</button>
         <label class="btn ghost" for="fileInput">Wczytaj plik</label>
-        <input type="file" id="fileInput" accept=".txt,.md,.csv,.html,.htm,text/plain" hidden>
+        <input type="file" id="fileInput" hidden>
         <button type="button" class="ghost" id="btnClear">Wyczyść</button>
       </div>
     </div>
-    <p class="hint">Wklej dowolny tekst w języku naturalnym – opis zadania, fragment uchwały, notatkę, ogłoszenie, e-mail.
+    <p class="hint">Wklej dowolny tekst w języku naturalnym – opis zadania, fragment uchwały, notatkę, ogłoszenie, e-mail –
+      albo wczytaj plik PDF, DOCX, ODT lub tekstowy.
       Model wyciągnie z niego dane inwestycji. Tekst nie opuszcza komputera.</p>
 
     <div class="editor-wrap">
       <textarea id="text" spellcheck="false" placeholder="np. Gmina Rydzyna planuje w przyszłym roku budowę sieci kanalizacji sanitarnej w ul. Wolności o długości ok. 3,6 km. Szacowany koszt to 4,2 mln zł brutto, a realizacja potrwa 18 miesięcy od podpisania umowy…"></textarea>
       <div class="marked" id="marked" hidden></div>
-      <div class="drop" id="drop">Upuść plik tekstowy</div>
+      <div class="drop" id="drop">Upuść plik PDF, DOCX, ODT lub tekstowy</div>
     </div>
 
     <div class="input-foot">

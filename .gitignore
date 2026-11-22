@@ -17,3 +17,6 @@ wyniki_testu/
 debug/
 pliki/
 data/*.log
+
+# wyniki analiz zapisywane przez serwer ekstraktora
+wyniki/
