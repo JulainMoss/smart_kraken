@@ -559,6 +559,10 @@ def analyze_document(conn: sqlite3.Connection, doc_id: str, min_conf: float = 0.
     if not d:
         return 0
     pages = unj(zunpack(d["text_z"]), []) or []
+    if doc_id.startswith("REC-") and require is None:
+        # treść rekordu projektu – zawsze te same zasady (także przy ponownej analizie i wzbogacaniu)
+        min_conf, factor, require = 0.5, 1.1, EVENT_SIGNAL
+        event_type, method = "zdarzenie wskazane w rekordzie projektu", "reguła (katalog ekspercki) – treść rekordu projektu"
     clf = Classifier(conn)
     conn.execute("DELETE FROM risk_events WHERE doc_id=? AND status='pending'", (doc_id,))
     n = 0
