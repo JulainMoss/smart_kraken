@@ -80,7 +80,7 @@ async function refreshStatus(){
     const s = await api("/api/status");
     const d = s.db, L = s.llm || {};
     S.llm = L;
-    const model = L.enabled ? `<span class="status" title="${esc(L.data_location||"")}"><span class="dot ${L.online?"ok":"bad"}"></span>${esc(L.model)}${L.online?"":" – niedostępny"}</span>`
+    const model = L.enabled ? `<span class="status" title="${esc(L.data_location||"")}"><span class="dot ${L.online?(L.fallback_for?"warn":"ok"):"bad"}"></span>${esc(L.model)}${L.fallback_for?" (zapasowy)":""}${L.online?"":" – niedostępny"}</span>`
       : `<span class="status" title="Parametry odczytują reguły eksperckie"><span class="dot"></span>bez modelu językowego</span>`;
     $("#dbinfo").innerHTML = `<span><b>${d.procedures.toLocaleString("pl-PL")}</b> postępowań</span><span><b>${d.completed.toLocaleString("pl-PL")}</b> zakończonych</span>`+
       `<span><b>${d.events.toLocaleString("pl-PL")}</b> zdarzeń ryzyka</span>${model}`;

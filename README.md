@@ -113,6 +113,11 @@ data_location = "Claude (Anthropic) przez Claude Code – opis jest wysyłany do
 Warunek: zainstalowany i zalogowany Claude Code (`claude`, potem `/login`). To rozwiązanie do własnego użytku zespołu (pokaz, test);
 system produkcyjny dla wielu urzędników powinien korzystać z klucza API lub modelu lokalnego.
 
+**Łańcuch zapasowy (`[[llm.fallback]]` w `config.toml`):** gdy główny model nie odpowiada (brak programu `claude`, wyczerpany
+limit, brak sieci), system automatycznie próbuje kolejnych – w konfiguracji pokazu: Claude → Bielik w Ollamie (np. kontener
+z `docker-compose.yml`) → Bielik w llama.cpp → reguły eksperckie. Formularz i raport pokazują, który model faktycznie odpowiedział.
+Osoba testująca nie potrzebuje żadnej subskrypcji: model wywołuje serwer, na którym działa Risk Miner.
+
 **Wariant B – lokalny model (dane nie opuszczają komputera), bez internetu:**
 
 ```bash

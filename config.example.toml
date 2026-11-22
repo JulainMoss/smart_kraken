@@ -51,5 +51,20 @@ effort = ""                    # tylko claude-code: low / medium / high
 timeout_s = 180
 data_location = "lokalnie (bez modelu językowego)"   # opis wyświetlany użytkownikom: lokalnie / UE / poza UE
 
+
+# Łańcuch zapasowy: gdy główny model nie odpowiada (brak programu, wyczerpany limit, brak sieci),
+# system próbuje kolejnych; gdy żaden nie działa – odczyt regułami eksperckimi (zawsze działa).
+# [[llm.fallback]]
+# provider = "ollama"                                  # np. kontener z docker-compose.yml albo Ollama zainstalowana lokalnie
+# base_url = "http://127.0.0.1:11434"
+# model = "SpeakLeash/bielik-1.5b-v3.0-instruct:Q8_0"
+# data_location = "lokalnie (Ollama, model Bielik) – dane nie opuszczają komputera"
+
+# [[llm.fallback]]
+# provider = "openai"                                  # llama.cpp: scripts/start_llm.sh
+# base_url = "http://127.0.0.1:8080"
+# model = "bielik-1.5b-q8"
+# data_location = "lokalnie (llama.cpp, model Bielik) – dane nie opuszczają komputera"
+
 [expert]
 default_reviewer = "ekspert"

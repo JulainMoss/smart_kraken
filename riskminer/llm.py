@@ -16,6 +16,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
 import urllib.error
 import urllib.request
 from typing import Any
@@ -23,8 +24,33 @@ from typing import Any
 from . import config
 
 
+_tls = threading.local()   # bieżący dostawca w łańcuchu zapasowym (osobno dla każdego wątku serwera)
+
+
 def cfg() -> dict[str, Any]:
-    return config.get()["llm"]
+    ov = getattr(_tls, "override", None)
+    return ov if ov is not None else config.get()["llm"]
+
+
+def candidates() -> list[dict[str, Any]]:
+    """Główny dostawca + zapasowi z [[llm.fallback]] (np. Claude -> lokalny Bielik -> reguły)."""
+    base = {k: v for k, v in config.get()["llm"].items() if k != "fallback"}
+    out = [base]
+    for f in config.get()["llm"].get("fallback") or []:
+        if isinstance(f, dict) and f.get("provider"):
+            c = {**base, "effort": "", "claude_bin": "", **f}
+            c.setdefault("data_location", "lokalnie")
+            out.append(c)
+    return [c for c in out if (c.get("provider") or "none").lower() not in ("none", "", "off", "brak")]
+
+
+def reset_last() -> None:
+    _tls.last = None
+
+
+def last_used() -> dict[str, Any]:
+    """Który model faktycznie odpowiedział w ostatnim wywołaniu w tym wątku."""
+    return getattr(_tls, "last", None) or {"model": cfg().get("model"), "where": where(), "fallback": False}
 
 
 def enabled() -> bool:
@@ -39,8 +65,11 @@ def _http(url: str, payload: dict | None, timeout: float, headers: dict | None =
         return json.loads(r.read().decode("utf-8"))
 
 
-def _claude_bin() -> str | None:
-    return cfg().get("claude_bin") or shutil.which("claude")
+def _claude_bin(c: dict[str, Any] | None = None) -> str | None:
+    path = (c or cfg()).get("claude_bin")
+    if path:
+        return path if os.path.isfile(path) else None
+    return shutil.which("claude")
 
 
 def _claude_code(system: str, user: str, schema: dict | None) -> str:
@@ -80,14 +109,31 @@ def where() -> str:
 
 
 def status() -> dict[str, Any]:
-    c = cfg()
+    cands = candidates()
+    if not cands:
+        return _status_one(config.get()["llm"])
+    first = _status_one(cands[0])
+    if first.get("online") or len(cands) == 1:
+        first["fallbacks"] = [f.get("model") for f in cands[1:]]
+        return first
+    for c in cands[1:]:   # główny niedostępny – pokazujemy pierwszy działający zapasowy
+        st = _status_one(c)
+        if st.get("online"):
+            st["fallback_for"] = cands[0].get("model")
+            return st
+    first["fallbacks"] = [f.get("model") for f in cands[1:]]
+    return first
+
+
+def _status_one(c: dict[str, Any]) -> dict[str, Any]:
     out = {"provider": c.get("provider"), "model": c.get("model"), "url": c.get("base_url"), "online": False,
            "data_location": c.get("data_location"), "enabled": enabled()}
-    if not enabled():
+    if (c.get("provider") or "none").lower() in ("none", "", "off", "brak"):
+        out["enabled"] = False
         out["info"] = "Model językowy wyłączony – analiza oparta na regułach eksperckich i statystyce (działa offline)."
         return out
     if c["provider"] == "claude-code":
-        exe = _claude_bin()
+        exe = _claude_bin(c)
         out["online"] = bool(exe)
         out["model"] = c.get("model") or "domyślny model Claude Code"
         out["url"] = "Claude Code (subskrypcja Claude)"
@@ -113,6 +159,24 @@ def _auth() -> dict:
 
 
 def chat(system: str, user: str, schema: dict | None = None, max_tokens: int = 1500) -> str:
+    """Wywołanie z łańcuchem zapasowym: gdy dostawca nie odpowiada (brak programu, limit, brak sieci), próbujemy kolejnego."""
+    errors = []
+    cands = candidates()
+    for i, c in enumerate(cands):
+        _tls.override = c
+        try:
+            out = _chat_one(system, user, schema, max_tokens)
+            _tls.last = {"model": c.get("model"), "provider": c.get("provider"), "where": where(), "fallback": i > 0,
+                         "errors": list(errors)}
+            return out
+        except Exception as e:
+            errors.append(f"{c.get('model') or c.get('provider')}: {type(e).__name__}: {str(e)[:120]}")
+        finally:
+            _tls.override = None
+    raise RuntimeError("żaden model nie odpowiedział – " + "; ".join(errors) if errors else "model językowy wyłączony")
+
+
+def _chat_one(system: str, user: str, schema: dict | None = None, max_tokens: int = 1500) -> str:
     c = cfg()
     if c["provider"] == "claude-code":
         return _claude_code(system, user, schema)

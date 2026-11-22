@@ -196,3 +196,22 @@ class TestSectors(unittest.TestCase):
         }
         for text, sector in cases.items():
             self.assertEqual(sector_from_text(text)[0], sector, text)
+
+
+class TestFallbackChain(unittest.TestCase):
+    def test_next_provider_answers(self):
+        from unittest import mock
+        from riskminer import config, llm
+        conf = {"llm": {"provider": "claude-code", "model": "glowny", "fallback": [{"provider": "openai", "base_url": "http://x", "model": "zapasowy"}]}}
+        calls = []
+
+        def one(system, user, schema=None, max_tokens=1500):
+            calls.append(llm.cfg()["model"])
+            if llm.cfg()["model"] == "glowny":
+                raise RuntimeError("limit wyczerpany")
+            return '{"ok": true}'
+        with mock.patch.object(config, "get", return_value=conf), mock.patch.object(llm, "_chat_one", side_effect=one):
+            self.assertEqual(llm.chat_json("s", "u"), {"ok": True})
+            self.assertEqual(calls, ["glowny", "zapasowy"])
+            self.assertEqual(llm.last_used()["model"], "zapasowy")
+            self.assertTrue(llm.last_used()["fallback"])

@@ -232,9 +232,10 @@ def analyze(conn: sqlite3.Connection, q: dict[str, Any], title: str | None = Non
     rep["summary"] = plain_summary(rep)
     if use_llm and llm.enabled():
         try:
-            rep["llm_summary"] = {"kind": "WNIOSEK", "model": llm.cfg().get("model"),
-                                  "text": llm.summarize_report({"podsumowanie": rep["summary"], "flagi": [f["text"] for f in flags],
-                                                               "ryzyka": [(r["name"], round(r["share"] * 100)) for r in risks[:6]], "N": n})}
+            llm.reset_last()
+            text = llm.summarize_report({"podsumowanie": rep["summary"], "flagi": [f["text"] for f in flags],
+                                         "ryzyka": [(r["name"], round(r["share"] * 100)) for r in risks[:6]], "N": n})
+            rep["llm_summary"] = {"kind": "WNIOSEK", "model": llm.last_used().get("model"), "text": text}
         except Exception as e:
             rep["llm_summary"] = {"kind": "WNIOSEK", "error": f"Model niedostępny: {type(e).__name__}"}
     return rep

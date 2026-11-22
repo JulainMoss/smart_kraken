@@ -222,12 +222,16 @@ def _merge_llm(clf: Classifier, q: dict, text: str, put) -> None:
     label_to_feat = {v: k for k, v in feat_names.items()}
     t0 = time.time()
     try:
+        llm.reset_last()
         r = llm.understand_query(text, list(label_to_feat))
     except Exception as e:  # model niedostępny – zostają reguły
         q["warnings"].append(f"Model językowy niedostępny ({type(e).__name__}) – parametry odczytano regułami.")
         return
     q["llm"] = r
-    q["llm_info"] = {"model": llm.cfg().get("model"), "seconds": round(time.time() - t0, 1), "where": llm.where()}
+    used = llm.last_used()
+    q["llm_info"] = {"model": used.get("model"), "seconds": round(time.time() - t0, 1), "where": used.get("where"), "fallback": used.get("fallback")}
+    if used.get("fallback"):
+        q["warnings"].append(f"Główny model był niedostępny – parametry odczytał model zapasowy {used.get('model')} ({used.get('where')}).")
     q["method"] = "model językowy + reguły"
     conflicts = q.setdefault("conflicts", {})
     sub_names = {s["code"]: s["name"] for s in clf.subsectors}
