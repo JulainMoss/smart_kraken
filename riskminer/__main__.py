@@ -111,6 +111,13 @@ def cmd_test_run(a):
     print(f"\nWyniki testu w katalogu: {out.resolve()}")
 
 
+def cmd_auto_approve(a):
+    from .expert_policy import auto_approve, policy
+    c = _conn()
+    n = auto_approve(c)
+    print(f"Polityka eksperta {policy(c)}: zatwierdzono {n} zdarzeń.")
+
+
 def cmd_extras(a):
     from .sources.lake import ingest_lake
     c = _conn()
@@ -158,6 +165,7 @@ def main(argv=None):
     s.add_argument("--out", default="wyniki_testu")
     s.add_argument("--offline", action="store_true")
     sub.add_parser("extras", help="wczytaj dodatkowe źródła z data_lake")
+    sub.add_parser("auto-approve", help="polityka eksperta: zatwierdź zdarzenia o wysokim prawdopodobieństwie")
     s = sub.add_parser("link-report")
     s.add_argument("--out")
     a = ap.parse_args(argv)
@@ -168,7 +176,8 @@ def main(argv=None):
         serve(getattr(a, "host", None), getattr(a, "port", None), False if getattr(a, "no_browser", False) else None)
         return
     {"build": cmd_build, "reanalyze": cmd_reanalyze, "import": cmd_import, "analyze": cmd_analyze, "export-project": cmd_export_project,
-     "test-run": cmd_test_run, "extras": cmd_extras, "link-report": cmd_link_report}[a.cmd](a)
+     "test-run": cmd_test_run, "extras": cmd_extras, "link-report": cmd_link_report,
+     "auto-approve": cmd_auto_approve}[a.cmd](a)
 
 
 if __name__ == "__main__":

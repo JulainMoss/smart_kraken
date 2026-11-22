@@ -287,6 +287,9 @@ DEFAULT_SETTINGS = {
     "search.min_sample_warning": 8,
     "report.exemplary_boost": 0.05,
     "llm.enabled_for": ["query", "summary"],
+    "search.llm_judge": True,
+    "expert.auto_approve": {"enabled": True, "min_confidence": 0.8,
+                            "reviewer": "ekspert (polityka: zatwierdzanie zdarzeń o wysokim prawdopodobieństwie)"},
 }
 
 # Lista kontrolna przygotowania – z materiału eksperckiego (inwestycja wodociągowa) + ogólne

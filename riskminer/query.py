@@ -103,6 +103,12 @@ def understand(conn: sqlite3.Connection, text: str, use_llm: bool = True) -> dic
     db_ = clf.design_build(text)
     put("design_build", db_, _quote(text, r"zaprojektuj|projektuj i buduj|\bpfu\b|zaprojektowani") if db_ else "")
     b = extract_budget(text)
+    if not b:
+        w = amount_from_words(text)
+        if w and w[0] >= 10_000:
+            vat = "netto" if re.search(r"netto", fold(text[text.find(w[1]):text.find(w[1]) + len(w[1]) + 30])) else \
+                  "brutto" if re.search(r"brutto", fold(text[text.find(w[1]):text.find(w[1]) + len(w[1]) + 30])) else "nieokreślone"
+            b = {"value": w[0], "quote": w[1], "vat": vat}
     put("budget", b["value"] if b else None, b["quote"] if b else "")
     put("budget_vat", b["vat"] if b else "nieokreślone")
     d = extract_duration_days(text)
@@ -179,6 +185,27 @@ def _num(s: str) -> float | None:
         return float(WORD_NUM[s])
     m = re.search(r"\d+(?:[.,]\d+)?", s.replace(" ", ""))
     return float(m.group(0).replace(",", ".")) if m else None
+
+
+_UNITS = {"pol": 0.5, "poltora": 1.5, "jeden": 1, "jedna": 1, "dwa": 2, "dwie": 2, "trzy": 3, "cztery": 4, "piec": 5, "szesc": 6,
+          "siedem": 7, "osiem": 8, "dziewiec": 9, "dziesiec": 10, "jedenascie": 11, "dwanascie": 12, "pietnascie": 15, "dwadziescia": 20,
+          "trzydziesci": 30, "czterdziesci": 40, "piecdziesiat": 50, "sto": 100, "dwiescie": 200, "trzysta": 300, "czterysta": 400,
+          "piecset": 500, "szescset": 600, "siedemset": 700, "osiemset": 800, "dziewiecset": 900}
+_MULTS = (("miliard", 1e9), ("mld", 1e9), ("milion", 1e6), ("mln", 1e6), ("tysiac", 1e3), ("tysiec", 1e3), ("tys", 1e3))
+
+
+def amount_from_words(text: str) -> tuple[float, str] | None:
+    """„półtora miliona złotych” -> 1 500 000; „dwa i pół miliona” -> 2 500 000; „osiemset tysięcy” -> 800 000."""
+    f = fold(text)
+    words = "|".join(sorted(_UNITS, key=len, reverse=True))
+    m = re.search(rf"\b((?:(?:{words})\s+)+)(i\s+pol\s+)?(miliard\w*|mld|milion\w*|mln|tysi\w*|tys)\b", f)
+    if not m:
+        return None
+    base = sum(_UNITS[w] for w in m.group(1).split() if w in _UNITS)
+    if m.group(2):
+        base += 0.5
+    mult = next(v for k, v in _MULTS if m.group(3).startswith(k))
+    return base * mult, text[m.start():m.end()]
 
 
 def _is_vague(P: dict) -> bool:
@@ -295,26 +322,26 @@ def _merge_llm(clf: Classifier, q: dict, text: str, put) -> None:
         if verify_quote(quote, text):
             put(key, value, quote, "model")
 
-    k = r["planowana_kwota"]
-    if k.get("kwota") and (k.get("waluta") or "PLN") == "PLN" and k.get("zrodlo") != "brak":
-        number("budget", float(k["kwota"]), k.get("cytat", ""), fmt_pln)
-        if P["budget"]["source"] == "model" and k.get("vat") in ("netto", "brutto"):
-            put("budget_vat", k["vat"], k.get("cytat", ""), "model")
-    t = r["planowany_czas"]
-    if t.get("dni") and 7 <= t["dni"] <= 3650:
-        number("duration_days", int(t["dni"]), t.get("cytat", ""), lambda x: f"{x} dni")
-
-    # zakres rzeczowy: długość sieci (m -> km) i liczba przyłączy – tylko pozycje z liczbą w cytacie, cytat w tekście
-    items = [x for x in r["zakres_rzeczowy"] if x.get("liczba_w_cytacie") and x.get("zrodlo") != "brak"]
-    lin = _NETWORK | ({"nawierzchnie i drogi"} if P["sector"]["value"] in ("drogi", "kolej") else set())
-    net = [x for x in items if x["element"] in lin and x["jednostka_bazowa"] == "m"]
-    if net:
-        km = round(sum(x["ilosc_bazowa"] for x in net) / 1000.0, 3)
-        number("length_km", km if km < 500 else None, max(net, key=lambda x: x["ilosc_bazowa"])["cytat"], lambda x: f"{x:g} km")
-    con = [x for x in items if x["element"] in _CONNECTIONS and x["jednostka_bazowa"] == "szt."]
-    if con:
-        n = int(sum(x["ilosc_bazowa"] for x in con))
-        number("connections", n if n < 20000 else None, con[0]["cytat"])
+    k = r.get("kwota") or {}
+    amount = parse_amount(k.get("tekst")) if k.get("tekst") else None
+    if not amount and k.get("tekst"):
+        w = amount_from_words(k["tekst"])
+        amount = w[0] if w else None
+    if amount and amount < 1000 and re.search(r"mln|milion", fold(k.get("tekst", ""))):
+        amount *= 1e6
+    number("budget", amount, k.get("cytat", ""), fmt_pln)
+    if P["budget"]["source"] == "model" and k.get("vat") in ("netto", "brutto"):
+        put("budget_vat", k["vat"], k.get("cytat", ""), "model")
+    d = r.get("czas_realizacji") or {}
+    n = _num(d.get("liczba"))
+    mult = {"dni": 1, "tygodnie": 7, "miesiące": 30.4375, "lata": 365.25}.get(d.get("jednostka") or "")
+    number("duration_days", int(round(n * mult)) if n and mult and 7 <= n * mult <= 3650 else None, d.get("cytat", ""), lambda x: f"{x} dni")
+    v, c = field("dlugosc_sieci_km")
+    km = _num(v)
+    number("length_km", km if km and km < 500 else None, c, lambda x: f"{x:g} km")
+    v, c = field("liczba_przylaczy")
+    con = _num(v)
+    number("connections", int(con) if con and con < 20000 else None, c)
 
     # elementy techniczne: suma reguł i elementów rozpoznanych w cytatach zakresu rzeczowego
     feats = list(P["features"]["value"] or [])

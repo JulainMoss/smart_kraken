@@ -134,5 +134,9 @@ def import_bip(conn: sqlite3.Connection, urls: list[str], text: str = "", title:
     if not docs and errors:
         raise ValueError("; ".join(errors))
     total = sum(d["events"] for d in docs)
+    from .expert_policy import auto_approve
+    ids = [d["doc_id"] for d in docs]
+    if ids:
+        auto_approve(conn, f"doc_id IN ({','.join('?' * len(ids))})", tuple(ids))
     say(f"Gotowe: {len(docs)} dokumentów, {total} fragmentów wskazujących na ryzyko (czekają na weryfikację eksperta).")
     return {"documents": docs, "events": total, "errors": errors}
