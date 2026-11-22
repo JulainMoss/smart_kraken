@@ -628,7 +628,8 @@ def analyze_document(conn: sqlite3.Connection, doc_id: str, min_conf: float = 0.
         min_conf, factor, require = 0.5, 1.1, EVENT_SIGNAL
         event_type, method = "zdarzenie wskazane w rekordzie projektu", "reguła (katalog ekspercki) – treść rekordu projektu"
     clf = Classifier(conn)
-    conn.execute("DELETE FROM risk_events WHERE doc_id=? AND status='pending'", (doc_id,))
+    # ponowna analiza zastępuje propozycje automatyczne (także zatwierdzone tylko przez politykę); decyzje człowieka zostają
+    conn.execute("DELETE FROM risk_events WHERE doc_id=? AND (status='pending' OR (status='approved' AND reviewer LIKE 'ekspert (polityka%'))", (doc_id,))
     n = 0
     # zdania już zapisane w innych dokumentach projektu (menu i stopki BIP powtarzają się na każdej stronie)
     seen = {(r[0], fold(r[1] or "")[:80]) for r in conn.execute(
