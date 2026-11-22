@@ -41,7 +41,7 @@ DEFAULTS: dict[str, Any] = {
         "api_key_env": "RISKMINER_LLM_API_KEY",
         "temperature": 0.0,
         "timeout_s": 180,
-        "data_location": "lokalnie (Ollama na tym komputerze)",
+        "data_location": "lokalnie (bez modelu językowego – dane nie opuszczają komputera)",
     },
     "expert": {"default_reviewer": "ekspert"},
 }
