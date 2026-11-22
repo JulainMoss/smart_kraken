@@ -16,3 +16,4 @@ wyniki_testu/
 # zapis zapytań i odpowiedzi modelu (debug – narzędzie ekstraktora)
 debug/
 pliki/
+data/*.log
