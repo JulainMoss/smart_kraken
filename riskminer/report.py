@@ -194,11 +194,15 @@ def analyze(conn: sqlite3.Connection, q: dict[str, Any], title: str | None = Non
 
     # ---------------- czerwone flagi
     flags = _flags(P, time_fc, cost_fc, budget_check, tender_fc, risks, checklist, n)
+    if q.get("vague"):
+        flags.insert(0, {"level": "red", "kind": "WNIOSEK", "basis": "rozpoznane parametry opisu",
+                         "text": "Opis jest zbyt ogólny – nie wiadomo, co ma zostać zbudowane. Podobne inwestycje dobrano głównie po słowach, "
+                                 "więc wyniki mogą nie pasować. Uzupełnij rodzaj inwestycji, skalę, budżet i termin."})
     # ---------------- rekomendacje
     recs = _recommendations(risks, checklist, P)
     # ---------------- kontakty
     contacts = _contacts(conn, group)
-    low_data = n < min_n or (group and group[0]["score"] < 0.45)
+    low_data = n < min_n or (group and group[0]["score"] < 0.45) or bool(q.get("vague"))
     comparables = [_case_card(conn, r) for r in group]
     others = [_case_card(conn, r, light=True) for r in found if r not in group][:10]
 

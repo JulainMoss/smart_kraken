@@ -4,39 +4,75 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Risk Miner – baza doświadczeń inwestycji publicznych</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b3b7a'/%3E%3Cpath d='M8 22 L13 14 L17 18 L24 9' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231f2328'/%3E%3Cpath d='M8 22 L13 14 L17 18 L24 9' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
-<header class="topbar">
-  <div class="brand">
-    <div class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M7 23 L13 14 L17 18 L25 8" stroke="white" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-    <div>
-      <div class="brand-name">Risk Miner</div>
-      <div class="brand-sub">Baza doświadczeń inwestycji publicznych</div>
-    </div>
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></symbol>
+  <symbol id="i-projects" viewBox="0 0 16 16"><rect x="1.75" y="2.25" width="12.5" height="11.5" rx="1.5"/><path d="M1.75 6h12.5M6 6v7.75"/></symbol>
+  <symbol id="i-database" viewBox="0 0 16 16"><ellipse cx="8" cy="3.5" rx="5.5" ry="2"/><path d="M2.5 3.5v9c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2v-9M2.5 8c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 16 16"><path d="M8 1.5 2.5 3.5v4c0 3.3 2.3 5.9 5.5 7 3.2-1.1 5.5-3.7 5.5-7v-4z"/><path d="m5.5 8 1.8 1.8 3.5-3.5"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 16 16"><path d="M8 10V2.5M5 5.5l3-3 3 3M2.5 10.5v2a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2"/></symbol>
+  <symbol id="i-download" viewBox="0 0 16 16"><path d="M8 2.5V10M5 7l3 3 3-3M2.5 10.5v2a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.25V11M8 5h.01"/></symbol>
+  <symbol id="i-print" viewBox="0 0 16 16"><path d="M4.5 6V2.5h7V6M4.5 11.5h-2v-5h11v5h-2"/><rect x="4.5" y="9.5" width="7" height="4"/></symbol>
+  <symbol id="i-file" viewBox="0 0 16 16"><path d="M4 1.5h5l3.5 3.5v9.5H4z"/><path d="M9 1.5V5h3.5M6.5 8.5h4M6.5 11h4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5V8l2.5 1.5"/></symbol>
+  <symbol id="i-cost" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5"/><path d="M10 5.8c-.4-.6-1.1-.9-2-.9-1.2 0-2 .6-2 1.5 0 2 4 1.1 4 3.2 0 .9-.9 1.5-2 1.5-.9 0-1.7-.4-2.1-1M8 3.8v1.1M8 11.1v1.1"/></symbol>
+  <symbol id="i-tool" viewBox="0 0 16 16"><path d="M10.5 2a3 3 0 0 0-2.8 4.1L2.5 11.3l2.2 2.2 5.2-5.2A3 3 0 0 0 14 5.5l-1.8 1.8-1.9-.4-.4-1.9 1.8-1.8A3 3 0 0 0 10.5 2z"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 16 16"><rect x="1.5" y="3" width="13" height="10" rx="1.5"/><path d="m2 4 6 5 6-5"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 16 16"><path d="M3 2h3l1.2 3-1.7 1.1a8 8 0 0 0 3.4 3.4L10 7.8l3 1.2v3a1.5 1.5 0 0 1-1.5 1.5A10 10 0 0 1 1.5 3.5 1.5 1.5 0 0 1 3 2z"/></symbol>
+  <symbol id="i-sync" viewBox="0 0 16 16"><path d="M13.5 8A5.5 5.5 0 0 1 3.4 11M2.5 8A5.5 5.5 0 0 1 12.6 5M12.8 2v3.2H9.6M3.2 14v-3.2h3.2"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 16 16"><path d="M10.5 2.5l3 3L5 14H2v-3z"/></symbol>
+  <symbol id="i-star" viewBox="0 0 16 16"><path d="m8 1.8 1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="m3 8.5 3 3 7-7"/></symbol>
+  <symbol id="i-check-circle" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5"/><path d="m5.2 8.2 1.9 1.9 3.7-3.8"/></symbol>
+  <symbol id="i-circle" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 16 16"><path d="m4 4 8 8M12 4l-8 8"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 16 16"><path d="M7.1 2.5a1 1 0 0 1 1.8 0l5.4 9.6a1 1 0 0 1-.9 1.5H2.6a1 1 0 0 1-.9-1.5z"/><path d="M8 6.2v3.2M8 11.4h.01"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 16 16"><path d="M5.3 1.5h5.4l3.8 3.8v5.4l-3.8 3.8H5.3l-3.8-3.8V5.3z"/><path d="M8 4.8v3.8M8 11h.01"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 16 16"><path d="M13 7.5 8 12.5a3.2 3.2 0 0 1-4.5-4.5l5.5-5.5a2.1 2.1 0 0 1 3 3L6.5 11a1 1 0 0 1-1.5-1.5L10 4.5"/></symbol>
+  <symbol id="i-arrow-left" viewBox="0 0 16 16"><path d="M13 8H3M7 4 3 8l4 4"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 16 16"><path d="M3 8h10M9 4l4 4-4 4"/></symbol>
+  <symbol id="i-external" viewBox="0 0 16 16"><path d="M9 2.5h4.5V7M13.5 2.5 7 9M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3"/></symbol>
+  <symbol id="i-cpu" viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1"/><path d="M6 1.5V4M10 1.5V4M6 12v2.5M10 12v2.5M1.5 6H4M1.5 10H4M12 6h2.5M12 10h2.5"/></symbol>
+  <symbol id="i-history" viewBox="0 0 16 16"><path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9L2.5 5.7"/><path d="M2.5 2.5v3.2h3.2M8 5v3l2 1.5"/></symbol>
+  <symbol id="i-people" viewBox="0 0 16 16"><circle cx="6" cy="5.5" r="2.5"/><path d="M1.5 13.5c.4-2.4 2.2-4 4.5-4s4.1 1.6 4.5 4M10.5 3.2a2.5 2.5 0 0 1 0 4.6M12 9.8c1.3.5 2.2 1.8 2.5 3.7"/></symbol>
+</svg>
+
+<header class="header">
+  <div class="header-top">
+    <a class="brand" href="#/analiza">
+      <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M7 23 L13 14 L17 18 L25 8" stroke="white" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span class="brand-name">Risk Miner</span>
+    </a>
+    <span class="brand-sep">/</span>
+    <span class="brand-sub">baza doświadczeń inwestycji publicznych</span>
+    <div class="dbinfo" id="dbinfo" title="Stan bazy danych">…</div>
   </div>
   <nav class="mainnav" id="nav">
-    <a href="#/analiza" data-route="analiza">Nowa analiza</a>
-    <a href="#/projekty" data-route="projekty">Projekty</a>
-    <a href="#/baza" data-route="baza">Baza inwestycji</a>
-    <a href="#/ekspert" data-route="ekspert">Weryfikacja ekspercka <span class="badge" id="badgeReview" hidden></span></a>
-    <a href="#/import" data-route="import">Import danych</a>
-    <a href="#/o-systemie" data-route="o-systemie">O systemie</a>
+    <a href="#/analiza" data-route="analiza"><svg class="ic"><use href="#i-search"/></svg>Nowa analiza</a>
+    <a href="#/przetworz" data-route="przetworz"><svg class="ic"><use href="#i-file"/></svg>Przetwórz pliki</a>
+    <a href="#/projekty" data-route="projekty"><svg class="ic"><use href="#i-projects"/></svg>Projekty</a>
+    <a href="#/baza" data-route="baza"><svg class="ic"><use href="#i-database"/></svg>Baza inwestycji</a>
+    <a href="#/ekspert" data-route="ekspert"><svg class="ic"><use href="#i-shield"/></svg>Weryfikacja ekspercka <span class="counter" id="badgeReview" hidden></span></a>
+    <a href="#/import" data-route="import"><svg class="ic"><use href="#i-upload"/></svg>Import danych</a>
+    <a href="#/o-systemie" data-route="o-systemie"><svg class="ic"><use href="#i-info"/></svg>O systemie</a>
   </nav>
-  <div class="dbinfo" id="dbinfo" title="Stan bazy danych">…</div>
 </header>
 
 <main id="app" class="container"></main>
 
 <div class="modal" id="modal" hidden>
   <div class="modal-box" role="dialog" aria-modal="true">
-    <div class="modal-head"><h3 id="modalTitle"></h3><button class="icon-btn" id="modalClose" aria-label="Zamknij">✕</button></div>
+    <div class="modal-head"><h3 id="modalTitle"></h3><button class="icon-btn" id="modalClose" aria-label="Zamknij"><svg class="ic"><use href="#i-x"/></svg></button></div>
     <div class="modal-body" id="modalBody"></div>
   </div>
 </div>
 <div class="toast" id="toast" role="status"></div>
-<footer class="footer">Risk Miner · prototyp HackNation 2026 dla MFiPR · dane publiczne: BZP/e-Zamówienia, TED, KIO (SAOS), BIP, NIK, KPOŚK · <a href="#/o-systemie">źródła i metoda</a></footer>
+<footer class="footer">Risk Miner · prototyp HackNation 2026 dla MFiPR · dane publiczne: BZP / e-Zamówienia, TED, KIO (SAOS), BIP, NIK, KPOŚK · <a href="#/o-systemie">Źródła i metoda</a></footer>
 <script src="assets/app.js"></script>
 </body>
 </html>

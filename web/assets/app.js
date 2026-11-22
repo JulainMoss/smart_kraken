@@ -43,6 +43,8 @@ const pct = (v, d = 0) => v == null ? "b.d." : (v*100).toLocaleString("pl-PL",{m
 const sgn = (v, d = 1) => v == null ? "b.d." : (v > 0 ? "+" : "") + v.toLocaleString("pl-PL",{maximumFractionDigits:d}) + "%";
 const days = d => d == null ? "b.d." : (d >= 60 ? `${Math.round(d)} dni (≈${(d/30.44).toLocaleString("pl-PL",{maximumFractionDigits:1})} mies.)` : `${Math.round(d)} dni`);
 const tag = (txt, cls) => `<span class="tag ${cls}">${esc(txt)}</span>`;
+const ic = (n, cls = "") => `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+const cnt = n => `<span class="counter">${n}</span>`;
 const evTag = st => tag(...(STATUS_EV[st] || [st, "grey"]));
 const yesno = v => v === 1 || v === true ? "tak" : v === 0 || v === false ? "nie" : "b.d.";
 function openModal(title, html){ $("#modalTitle").textContent = title; $("#modalBody").innerHTML = html; $("#modal").hidden = false; }
@@ -58,7 +60,7 @@ function download(url){ const a = document.createElement("a"); a.href = url; a.c
 /* ---------------------------------------------------------------- nawigacja */
 const ROUTES = {
   "analiza": viewAnalysis, "raport": viewSavedReport, "projekty": viewProjects, "projekt": viewProject,
-  "baza": viewCases, "ekspert": viewExpert, "import": viewImport, "o-systemie": viewAbout,
+  "baza": viewCases, "ekspert": viewExpert, "import": viewImport, "o-systemie": viewAbout, "przetworz": viewProcess,
 };
 async function route(){
   const h = location.hash.replace(/^#\/?/, "") || "analiza";
@@ -74,10 +76,13 @@ window.addEventListener("hashchange", route);
 async function refreshStatus(){
   try{
     const s = await api("/api/status");
-    const d = s.db;
-    $("#dbinfo").innerHTML = `<b>${d.procedures.toLocaleString("pl-PL")}</b> postępowań · <b>${d.completed.toLocaleString("pl-PL")}</b> zakończonych<br>`+
-      `${d.events.toLocaleString("pl-PL")} zdarzeń ryzyka · model: ${s.llm.enabled ? esc(s.llm.model) : "reguły (offline)"}`;
-    const b = $("#badgeReview"); const n = d.links_uncertain + (d.events_pending > 0 ? 0 : 0);
+    const d = s.db, L = s.llm || {};
+    S.llm = L;
+    const model = L.enabled ? `<span class="status" title="${esc(L.data_location||"")}"><span class="dot ${L.online?"ok":"bad"}"></span>${esc(L.model)}${L.online?"":" – niedostępny"}</span>`
+      : `<span class="status" title="Parametry odczytują reguły eksperckie"><span class="dot"></span>bez modelu językowego</span>`;
+    $("#dbinfo").innerHTML = `<span><b>${d.procedures.toLocaleString("pl-PL")}</b> postępowań</span><span><b>${d.completed.toLocaleString("pl-PL")}</b> zakończonych</span>`+
+      `<span><b>${d.events.toLocaleString("pl-PL")}</b> zdarzeń ryzyka</span>${model}`;
+    const b = $("#badgeReview");
     b.hidden = !d.links_uncertain; b.textContent = d.links_uncertain;
     return s;
   }catch{ $("#dbinfo").textContent = "brak połączenia z serwerem"; }
@@ -85,49 +90,59 @@ async function refreshStatus(){
 
 /* ================================================================ NOWA ANALIZA */
 const EXAMPLES = [
-  {t:"Kanalizacja sanitarna (wieś, ZiW)", x:`Gmina Rydzyna (powiat leszczyński, województwo wielkopolskie) przygotowuje inwestycję pn. „Budowa sieci kanalizacji sanitarnej wraz z przyłączami w miejscowości Kłoda”. Zakres obejmuje wykonanie ok. 3,6 km kanalizacji grawitacyjnej z rur PVC-U DN 200, 1,2 km rurociągu tłocznego PE DN 110, dwóch sieciowych przepompowni ścieków oraz 85 przyłączy do granic działek. Część odcinków pod drogą wojewódzką nr 309 zostanie wykonana metodą przewiertu sterowanego.
+  {t:"Kanalizacja w gminie wiejskiej – pełny opis", x:`Gmina Rydzyna (powiat leszczyński, województwo wielkopolskie) przygotowuje inwestycję pn. „Budowa sieci kanalizacji sanitarnej wraz z przyłączami w miejscowości Kłoda”. Zakres obejmuje wykonanie ok. 3,6 km kanalizacji grawitacyjnej z rur PVC-U DN 200, 1,2 km rurociągu tłocznego PE DN 110, dwóch sieciowych przepompowni ścieków oraz 85 przyłączy do granic działek. Część odcinków pod drogą wojewódzką nr 309 zostanie wykonana metodą przewiertu sterowanego.
 
 Zadanie będzie realizowane w formule „zaprojektuj i wybuduj” – wykonawca opracuje dokumentację projektową i uzyska pozwolenie na budowę. Wartość szacunkowa zamówienia to 4,2 mln zł netto; gmina zabezpieczyła środki w WPF na lata 2027–2028 i ubiega się o dofinansowanie z programu FEnIKS. Planowany termin realizacji: 14 miesięcy od dnia podpisania umowy.
 
 Znane trudności: wysoki poziom wód gruntowych w rejonie ul. Polnej, część trasy przebiega przez działki prywatne.`},
-  {t:"Sieć wodociągowa", x:`Gmina planuje rozbudowę sieci wodociągowej w miejscowościach Nowa Wieś i Stara Wieś (województwo mazowieckie). Planowana sieć z rur PE o średnicy 110–160 mm będzie miała długość około 6,5 km, wraz z 40 przyłączami i hydrantami przeciwpożarowymi. Sieć zostanie włączona do istniejącego wodociągu zasilanego ze stacji uzdatniania wody w Nowej Wsi. Budżet: 3,1 mln zł brutto, termin realizacji 10 miesięcy. Inwestycja w ramach KPO.`},
-  {t:"Modernizacja SUW", x:`Modernizacja stacji uzdatniania wody w miejscowości Czernice wraz z wymianą filtrów, budową zbiornika wody czystej 150 m3 i automatyką. Rozruch technologiczny i próby wydajności. Szacunkowy koszt 2,4 mln zł netto. Czas realizacji 12 miesięcy. Województwo kujawsko-pomorskie.`},
-  {t:"Oczyszczalnia ścieków", x:`Przebudowa i rozbudowa gminnej oczyszczalni ścieków (reaktor SBR, przepustowość 400 m3/d) w formule zaprojektuj i wybuduj. Wymagany rozruch technologiczny i osiągnięcie parametrów oczyszczania. Wartość ok. 9 mln zł brutto, 20 miesięcy. Województwo lubelskie.`},
+  {t:"Zbyt mały budżet i zbyt krótki termin", x:`Budowa kanalizacji sanitarnej grawitacyjnej i tłocznej o długości 15 km z 5 przepompowniami w gminie Kłodawa, woj. lubuskie. Budżet 3 mln zł netto, realizacja w 6 miesięcy.`},
+  {t:"Opis potoczny, jak w mailu", x:`Dzień dobry, chcemy w przyszłym roku zbudować kanalizację w naszej gminie – mniej więcej 5 km sieci i ze 40 przyłączy do domów. Mamy na to około 6 mln zł brutto i rok na realizację. Część trasy idzie wzdłuż drogi powiatowej. Na co powinniśmy uważać?`},
+  {t:"Oczyszczalnia ścieków – zaprojektuj i wybuduj", x:`Gmina Wadowice (woj. małopolskie) planuje modernizację i rozbudowę oczyszczalni ścieków do przepustowości 1200 m3/d w formule zaprojektuj i wybuduj. Wymagany rozruch technologiczny i osiągnięcie parametrów oczyszczania. Wartość 24 mln zł netto, czas realizacji 30 miesięcy.`},
+  {t:"Stacja uzdatniania wody z wodociągiem", x:`Budowa stacji uzdatniania wody wraz z siecią wodociągową o długości 4 km w gminie Juchnowiec Kościelny, woj. podlaskie. Budżet 5 mln zł netto, 10 miesięcy.`},
+  {t:"Rzadka technologia: kanalizacja podciśnieniowa", x:`Budowa kanalizacji podciśnieniowej ze stacją próżniową dla 80 budynków w gminie nadmorskiej, woj. pomorskie. Długość sieci 2,5 km, budżet 4 mln zł, realizacja 12 miesięcy.`},
+  {t:"Kanalizacja deszczowa i retencja", x:`Budowa kanalizacji deszczowej ze zbiornikiem retencyjnym i separatorem w mieście Łowicz, woj. łódzkie. Długość kolektorów 3,2 km, budżet 9 mln zł netto, 14 miesięcy. Inwestycja z dofinansowaniem z programu FEnIKS.`},
 ];
 
 async function viewAnalysis(){
   const draft = (() => { try{ return localStorage.getItem("rm_text") || ""; }catch{ return ""; } })();
+  const L = S.llm || {};
   app().innerHTML = `
   <div class="page-title"><div><h1>Nowa analiza inwestycji</h1>
-    <p>Opisz planowaną inwestycję własnymi słowami albo wczytaj wstępne dokumenty. System znajdzie podobne, zakończone inwestycje w Polsce,
+    <p>Opisz planowaną inwestycję własnymi słowami albo wczytaj dokument. System znajdzie podobne, zakończone inwestycje w Polsce,
     sprawdzi, jakie problemy w nich wystąpiły (opóźnienia, wzrost kosztów, zmiany umów), i przygotuje raport z rekomendacjami.</p></div>
-    <a class="btn" href="#/raport">Zapisane raporty</a></div>
+    <a class="btn" href="#/raport">${ic("history")}Zapisane raporty</a></div>
   <div class="steps"><div class="step active"><span class="n">1</span>Opis inwestycji</div><div class="step"><span class="n">2</span>Sprawdzenie parametrów</div><div class="step"><span class="n">3</span>Raport</div></div>
-  <div class="grid" style="grid-template-columns:minmax(0,2fr) minmax(0,1fr)">
-    <div class="card">
-      <label class="field" for="txt">Opis planowanej inwestycji</label>
-      <textarea id="txt" placeholder="Np.: Gmina planuje budowę 3,6 km kanalizacji sanitarnej z dwiema przepompowniami i 85 przyłączami w formule zaprojektuj i wybuduj. Budżet 4,2 mln zł netto, termin 14 miesięcy…">${esc(draft)}</textarea>
-      <div class="row" style="margin-top:10px">
-        <label class="btn" for="fileIn">📄 Wczytaj dokument (DOCX, PDF, TXT)</label>
-        <input type="file" id="fileIn" hidden accept=".docx,.pdf,.txt,.doc,.odt,.rtf,.md,.html">
-        <span class="muted" id="chars"></span><div class="spacer"></div>
-        <button class="primary btn-lg" id="go">Przygotuj raport →</button>
-      </div>
-    </div>
+  <div class="grid layout-side">
     <div>
-      <div class="help"><h4>Co warto napisać w opisie?</h4>
-        <ul style="margin:.3rem 0 .3rem 1.1rem;padding:0">
-          <li>rodzaj inwestycji (np. kanalizacja, wodociąg, oczyszczalnia),</li><li>skalę: długość sieci, liczbę przyłączy, przepompownie,</li>
-          <li>planowany budżet i termin,</li><li>formułę (projekt gotowy czy „zaprojektuj i wybuduj”),</li>
-          <li>miejsce i znane trudności (drogi, rzeki, grunty prywatne).</li></ul>
-        <small>Im pełniejszy opis, tym trafniejsze porównanie. Brakujące elementy system wskaże w raporcie.</small></div>
-      <div class="card flat" style="margin-top:12px"><h4>Przykłady do wypróbowania</h4><div class="example-list">${EXAMPLES.map((e,i)=>`<button class="small" data-ex="${i}">${esc(e.t)}</button>`).join("")}</div></div>
+      <div class="card">
+        <div class="card-head"><h2>Opis planowanej inwestycji</h2><span class="muted" id="chars"></span></div>
+        <textarea id="txt" aria-label="Opis planowanej inwestycji" placeholder="Np.: Gmina planuje budowę 3,6 km kanalizacji sanitarnej z dwiema przepompowniami i 85 przyłączami w formule zaprojektuj i wybuduj. Budżet 4,2 mln zł netto, termin 14 miesięcy…">${esc(draft)}</textarea>
+        <div class="row" style="margin-top:12px">
+          <label class="btn" for="fileIn">${ic("file")}Wczytaj dokument</label><span class="muted">DOCX, PDF, TXT</span>
+          <input type="file" id="fileIn" hidden accept=".docx,.pdf,.txt,.doc,.odt,.rtf,.md,.html">
+          <div class="spacer"></div>
+          <button class="primary btn-lg" id="go">Analizuj opis</button>
+        </div>
+      </div>
+      <p class="muted" style="font-size:12px">Skrót: Ctrl+Enter. Szkic opisu zapisuje się w tej przeglądarce.</p>
     </div>
+    <aside>
+      <div class="help"><h4>Co warto napisać</h4>
+        <ul><li>rodzaj inwestycji (kanalizacja, wodociąg, oczyszczalnia…)</li><li>skalę: długość sieci, liczbę przyłączy, przepompownie</li>
+          <li>planowany budżet i termin</li><li>formułę: gotowy projekt czy „zaprojektuj i wybuduj”</li>
+          <li>miejsce i znane trudności (drogi, rzeki, grunty prywatne)</li></ul>
+        <small>Brakujące informacje system wskaże w raporcie.</small></div>
+      <div class="help"><h4>Przykłady</h4><ul class="side-list">${EXAMPLES.map((e,i)=>`<li><button class="link-btn" data-ex="${i}">${ic("file")}${esc(e.t)}</button></li>`).join("")}</ul></div>
+      <div class="help" style="border:none"><h4>Odczyt opisu</h4>
+        <div class="model-box">${ic("cpu")}<div>${L.enabled ? `Parametry odczytuje model językowy <b>${esc(L.model)}</b>
+          ${L.online ? tag("dostępny","ok") : tag("niedostępny – użyte zostaną reguły","warn")}<br><small>${esc(L.data_location || "")}</small>`
+          : `Parametry odczytują reguły eksperckie (bez modelu językowego).<br><small>Model można włączyć w pliku <code>config.toml</code>.</small>`}</div></div></div>
+    </aside>
   </div>`;
   const txt = $("#txt");
   const upd = () => { $("#chars").textContent = `${txt.value.length.toLocaleString("pl-PL")} znaków`; try{ localStorage.setItem("rm_text", txt.value); }catch{} };
   txt.addEventListener("input", upd); upd();
-  $$("[data-ex]").forEach(b => b.onclick = () => { txt.value = EXAMPLES[+b.dataset.ex].x; upd(); });
+  $$("[data-ex]").forEach(b => b.onclick = () => { txt.value = EXAMPLES[+b.dataset.ex].x; upd(); txt.focus(); });
   $("#fileIn").onchange = async e => {
     const f = e.target.files[0]; if(!f) return;
     toast(`Wczytuję ${f.name}…`);
@@ -144,40 +159,57 @@ async function runUnderstand(text){
   text = (text||"").trim();
   if(text.length < 15){ toast("Napisz kilka zdań o planowanej inwestycji."); return; }
   S.analysisText = text;
-  const btn = $("#go"); btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Analizuję opis…`;
+  const btn = $("#go"); btn.disabled = true;
+  const useModel = S.llm?.enabled && S.llm?.online;
+  const t0 = Date.now();
+  const label = () => `<span class="spinner"></span> ${useModel ? `Model czyta opis… ${Math.round((Date.now()-t0)/1000)} s` : "Analizuję opis…"}`;
+  btn.innerHTML = label();
+  const timer = setInterval(() => { btn.innerHTML = label(); }, 1000);
   try{
     const q = await api("/api/understand", {json:{text}});
     viewParams(q);
-  }catch(e){ toast(e.message, 5000); btn.disabled = false; btn.textContent = "Przygotuj raport →"; }
+  }catch(e){ toast(e.message, 5000); btn.disabled = false; btn.textContent = "Analizuj opis"; }
+  finally{ clearInterval(timer); }
 }
 
+const SRC_TAG = {"model": ["model", "model"], "model i reguły": ["model i reguły – zgodne", "ok"], "reguła": ["reguły", "grey"], "użytkownik": ["poprawione", "src"]};
 function viewParams(q){
-  const P = q.params, v = k => P[k]?.value;
-  const src = k => { const p = P[k]; if(!p) return ""; const s = p.source === "model" ? "model językowy" : p.source === "użytkownik" ? "poprawione" : "z opisu";
-    return p.quote ? `<div class="field-help">${s}: „${esc(p.quote.slice(0,110))}”</div>` : (p.value != null && p.value !== "" && p.value !== false ? `<div class="field-help">${s}</div>` : `<div class="field-help">nie podano w opisie – uzupełnij, jeśli znasz</div>`); };
+  const P = q.params, v = k => P[k]?.value, C = q.conflicts || {};
+  const has = k => { const x = v(k); return x != null && x !== "" && x !== false && !(Array.isArray(x) && !x.length); };
+  const src = k => { const p = P[k]; if(!p) return "";
+    const [lab, cls] = SRC_TAG[p.source] || [p.source, "grey"];
+    const conflict = C[k] ? `<div class="field-help conflict">${ic("alert")} Rozbieżność – ${esc(C[k])}. Sprawdź w opisie.</div>` : "";
+    if(!has(k) && p.source !== "model") return `<div class="field-help">Nie podano w opisie – uzupełnij, jeśli znasz.</div>${conflict}`;
+    return `<div class="field-help">${tag(lab, cls)}${p.quote ? ` <span class="q">„${esc(p.quote.slice(0,110))}”</span>` : ""}</div>${conflict}`; };
+  const fc = k => has(k) ? "filled" : "";
   const months = v("duration_days") ? Math.round(v("duration_days")/30.44*10)/10 : "";
   const feats = new Set(v("features") || []);
+  const li = q.llm_info;
   app().innerHTML = `
-  <div class="page-title"><div><h1>Sprawdź parametry inwestycji</h1><p>Tak zrozumieliśmy Twój opis. Popraw lub uzupełnij wartości – od nich zależy dobór podobnych inwestycji.</p></div></div>
-  <div class="steps"><div class="step done"><span class="n">✓</span>Opis inwestycji</div><div class="step active"><span class="n">2</span>Sprawdzenie parametrów</div><div class="step"><span class="n">3</span>Raport</div></div>
-  ${(q.warnings||[]).map(w => `<div class="notice warn">${esc(w)}</div>`).join("")}
-  ${q.summary_llm ? `<div class="notice">${KIND_TAG.WNIOSEK} <b>Streszczenie modelu:</b> ${esc(q.summary_llm)}</div>` : ""}
+  <div class="page-title"><div><h1>Sprawdź parametry inwestycji</h1><p>Tak odczytaliśmy Twój opis. Popraw lub uzupełnij wartości – od nich zależy dobór podobnych inwestycji.</p></div></div>
+  <div class="steps"><div class="step done"><span class="n">${ic("check")}</span>Opis inwestycji</div><div class="step active"><span class="n">2</span>Sprawdzenie parametrów</div><div class="step"><span class="n">3</span>Raport</div></div>
+  ${(q.warnings||[]).map((w,i) => `<div class="flag ${q.vague && i===0 ? "red" : "amber"}">${ic(q.vague && i===0 ? "stop" : "alert")}<div>${esc(w)}</div></div>`).join("")}
+  ${li ? `<div class="notice model"><div class="model-box">${ic("cpu")}<div><b>Formularz wypełnił model językowy ${esc(li.model)}</b> (lokalnie, ${String(li.seconds).replace(".",",")} s).
+    Każda wartość ma cytat z opisu, sprawdzony przez system; liczby porównano z regułami.${q.summary_llm ? `<br>Streszczenie: ${esc(q.summary_llm)}` : ""}</div></div></div>` : ""}
   <div class="card">
+    <div class="card-head"><h2>Parametry wyszukiwania</h2><span class="legend">Źródło wartości: ${tag("model","model")} ${tag("model i reguły – zgodne","ok")} ${tag("reguły","grey")}</span></div>
     <div class="form-grid">
-      <div><label class="field">Rodzaj inwestycji (podsektor)</label><select id="p_sub">${Object.entries(SUB).map(([k,n])=>`<option value="${k}" ${v("subsector")===k?"selected":""}>${n}</option>`).join("")}<option value="" ${!v("subsector")?"selected":""}>— inny / nie wiem —</option></select>${src("subsector")}</div>
-      <div><label class="field">Rodzaj robót</label><select id="p_wt"><option value="">— nie określono —</option>${WORKS.map(w=>`<option ${v("works_type")===w?"selected":""}>${w}</option>`).join("")}</select>${src("works_type")}</div>
-      <div style="grid-column:span 2"><label class="field">Budżet (zł) <span id="p_budget_fmt" class="muted" style="font-weight:400">${v("budget") ? "= " + pln(v("budget")) : ""}</span></label><div class="row" style="flex-wrap:nowrap"><input id="p_budget" type="number" min="0" step="1000" value="${v("budget") ?? ""}" placeholder="np. 4200000" style="flex:1"><select id="p_vat" style="width:140px">${["netto","brutto","nieokreślone"].map(x=>`<option ${v("budget_vat")===x?"selected":""}>${x}</option>`).join("")}</select></div>${src("budget")}</div>
-      <div><label class="field">Planowany czas realizacji (miesiące)</label><input id="p_dur" type="number" min="0" step="0.5" value="${months}">${src("duration_days")}</div>
-      <div><label class="field">Długość sieci (km)</label><input id="p_len" type="number" min="0" step="0.1" value="${v("length_km") ?? ""}">${src("length_km")}</div>
-      <div><label class="field">Liczba przyłączy</label><input id="p_con" type="number" min="0" step="1" value="${v("connections") ?? ""}">${src("connections")}</div>
-      <div><label class="field">Województwo</label><select id="p_prov"><option value="">— nie określono —</option>${Object.entries(PROV).map(([k,n])=>`<option value="${k}" ${v("province")===k?"selected":""}>${n}</option>`).join("")}</select>${src("province")}</div>
-      <div><label class="field">Formuła realizacji</label><label class="check" style="margin-top:8px"><input type="checkbox" id="p_db" ${v("design_build")?"checked":""}> „zaprojektuj i wybuduj”</label>${src("design_build")}</div>
+      <div class="${fc("subsector")}"><label class="field" for="p_sub">Rodzaj inwestycji</label><select id="p_sub">${Object.entries(SUB).map(([k,n])=>`<option value="${k}" ${v("subsector")===k?"selected":""}>${n}</option>`).join("")}<option value="" ${!v("subsector")?"selected":""}>inny / nie wiem</option></select>${src("subsector")}</div>
+      <div class="${fc("works_type")}"><label class="field" for="p_wt">Rodzaj robót</label><select id="p_wt"><option value="">nie określono</option>${WORKS.map(w=>`<option ${v("works_type")===w?"selected":""}>${w}</option>`).join("")}</select>${src("works_type")}</div>
+      <div class="${fc("budget")}" style="grid-column:span 2"><label class="field" for="p_budget">Budżet (zł) <span id="p_budget_fmt" class="muted" style="font-weight:400">${v("budget") ? "= " + pln(v("budget")) : ""}</span></label><div class="row" style="flex-wrap:nowrap"><input id="p_budget" type="number" min="0" step="1000" value="${v("budget") ?? ""}" placeholder="np. 4200000" style="flex:1"><select id="p_vat" style="width:150px" aria-label="VAT">${["netto","brutto","nieokreślone"].map(x=>`<option ${v("budget_vat")===x?"selected":""}>${x}</option>`).join("")}</select></div>${src("budget")}</div>
+      <div class="${fc("duration_days")}"><label class="field" for="p_dur">Czas realizacji (miesiące)</label><input id="p_dur" type="number" min="0" step="0.5" value="${months}">${src("duration_days")}</div>
+      <div class="${fc("length_km")}"><label class="field" for="p_len">Długość sieci (km)</label><input id="p_len" type="number" min="0" step="0.1" value="${v("length_km") ?? ""}">${src("length_km")}</div>
+      <div class="${fc("connections")}"><label class="field" for="p_con">Liczba przyłączy</label><input id="p_con" type="number" min="0" step="1" value="${v("connections") ?? ""}">${src("connections")}</div>
+      <div class="${fc("province")}"><label class="field" for="p_prov">Województwo</label><select id="p_prov"><option value="">nie określono</option>${Object.entries(PROV).map(([k,n])=>`<option value="${k}" ${v("province")===k?"selected":""}>${n}</option>`).join("")}</select>${src("province")}</div>
+      <div><label class="field">Formuła realizacji</label><label class="check" style="margin-top:6px"><input type="checkbox" id="p_db" ${v("design_build")?"checked":""}> „zaprojektuj i wybuduj”</label>${src("design_build")}</div>
+      ${has("org") || has("city") ? `<div><label class="field">Zamawiający / miejscowość</label><div style="padding-top:6px">${esc(v("org") || "–")}${v("city") ? ` · ${esc(v("city"))}` : ""}</div>${src(has("org") ? "org" : "city")}</div>` : ""}
     </div>
-    <div style="margin-top:14px"><label class="field">Elementy techniczne i warunki (zaznacz, które dotyczą inwestycji)</label>
+    <div style="margin-top:16px"><label class="field">Elementy techniczne i warunki</label><p class="muted" style="margin:0 0 8px">Zaznaczone zostały odczytane z opisu. Popraw, jeśli trzeba.</p>
       <div>${Object.entries(FEATS).map(([k,n])=>`<label class="chip ${feats.has(k)?"sel":""}"><input type="checkbox" data-feat="${k}" ${feats.has(k)?"checked":""}> ${n}</label>`).join("")}</div></div>
-    <div class="row" style="margin-top:16px"><button id="back">← Wróć do opisu</button><div class="spacer"></div>
-      <span class="muted">${esc(q.method)}</span><button class="primary btn-lg" id="run">Wygeneruj raport →</button></div>
-  </div>`;
+    ${q.search_terms?.length ? `<div style="margin-top:16px"><label class="field">Frazy do wyszukiwania</label><div>${q.search_terms.map(t=>`<span class="chip">${esc(t)}</span>`).join("")}</div></div>` : ""}
+  </div>
+  <div class="row"><button id="back">${ic("arrow-left")}Wróć do opisu</button><div class="spacer"></div>
+    <span class="muted">Metoda: ${esc(q.method)}</span><button class="primary btn-lg" id="run">Wygeneruj raport</button></div>`;
   $$("[data-feat]").forEach(c => c.onchange = () => c.parentElement.classList.toggle("sel", c.checked));
   $("#back").onclick = () => viewAnalysis();
   $("#p_budget").oninput = () => { const x = Number($("#p_budget").value); $("#p_budget_fmt").textContent = x ? "= " + pln(x) : ""; };
@@ -190,14 +222,14 @@ function viewParams(q){
     try{
       const rep = await api("/api/analyze", {json:{text:S.analysisText, query:q, overrides}});
       S.lastReport = rep; location.hash = `#/raport/${rep.analysis_id}`;
-    }catch(e){ toast(e.message, 6000); btn.disabled = false; btn.textContent = "Wygeneruj raport →"; }
+    }catch(e){ toast(e.message, 6000); btn.disabled = false; btn.textContent = "Wygeneruj raport"; }
   };
 }
 
 async function viewSavedReport(id){
   if(!id){
     const list = await api("/api/analyses");
-    app().innerHTML = `<div class="page-title"><div><h1>Zapisane raporty</h1><p>Każda analiza jest zapisywana jako rekord – można ją otworzyć i wyeksportować.</p></div><a class="btn primary" href="#/analiza">+ Nowa analiza</a></div>
+    app().innerHTML = `<div class="page-title"><div><h1>Zapisane raporty</h1><p>Każda analiza jest zapisywana jako rekord – można ją otworzyć i wyeksportować.</p></div><a class="btn primary" href="#/analiza">${ic("plus")}Nowa analiza</a></div>
       <div class="card">${list.length ? `<div class="table-wrap"><table><thead><tr><th>Data</th><th>Tytuł</th><th>Identyfikator</th></tr></thead><tbody>
       ${list.map(a=>`<tr class="click" data-id="${a.analysis_id}"><td>${esc(a.created_at.replace("T"," "))}</td><td>${esc(a.title)}</td><td><code>${a.analysis_id}</code></td></tr>`).join("")}</tbody></table></div>`
       : `<div class="empty">Brak zapisanych raportów.</div>`}</div>`;
@@ -219,12 +251,12 @@ function renderReport(r){
   <div class="page-title"><div><h1>Raport: ${esc(r.title)}</h1>
     <p>Analiza <code>${r.analysis_id}</code> · ${esc(r.created_at.replace("T"," "))} · porównano z <b>${n}</b> podobnymi, zakończonymi inwestycjami (baza: ${r.sample.db_completed_cases.toLocaleString("pl-PL")} zakończonych postępowań)</p></div>
     <div class="row no-print">
-      <button onclick="window.print()">🖨 Drukuj / PDF</button>
-      <a class="btn" href="/api/analyses/${r.analysis_id}/export?format=md">⬇ Raport (Markdown)</a>
-      <a class="btn" href="/api/analyses/${r.analysis_id}/export?format=csv">⬇ Tabele (CSV/Excel)</a>
-      <a class="btn" href="/api/analyses/${r.analysis_id}/export?format=json">⬇ Dane (JSON)</a>
-      <a class="btn primary" href="#/analiza">+ Nowa analiza</a></div></div>
-  <div class="steps no-print"><div class="step done"><span class="n">✓</span>Opis inwestycji</div><div class="step done"><span class="n">✓</span>Sprawdzenie parametrów</div><div class="step active"><span class="n">3</span>Raport</div></div>
+      <button onclick="window.print()">${ic("print")}Drukuj / PDF</button>
+      <a class="btn" href="/api/analyses/${r.analysis_id}/export?format=md">${ic("download")}Markdown</a>
+      <a class="btn" href="/api/analyses/${r.analysis_id}/export?format=csv">${ic("download")}CSV (Excel)</a>
+      <a class="btn" href="/api/analyses/${r.analysis_id}/export?format=json">${ic("download")}JSON</a>
+      <a class="btn primary" href="#/analiza">${ic("plus")}Nowa analiza</a></div></div>
+  <div class="steps no-print"><div class="step done"><span class="n">${ic("check")}</span>Opis inwestycji</div><div class="step done"><span class="n">${ic("check")}</span>Sprawdzenie parametrów</div><div class="step active"><span class="n">3</span>Raport</div></div>
   <div class="legend" style="margin-bottom:10px">Oznaczenia w raporcie: ${KIND_TAG.DANE} ${KIND_TAG.OBLICZ} ${KIND_TAG.WNIOSEK}</div>
   ${r.sample.low_data ? `<div class="notice warn"><b>Mało danych o podobnych inwestycjach (N = ${n}).</b> Wyniki są orientacyjne. Zalecamy kontakt z zamawiającymi, którzy realizowali podobne zadania –
     <a href="#" id="goContacts">zobacz listę kontaktów</a>.</div>` : ""}
@@ -242,15 +274,15 @@ function renderReport(r){
     <div class="card"><div class="card-head"><h2>Podsumowanie</h2>${KIND_TAG.OBLICZ}</div>
       <ul style="margin:0;padding-left:1.2rem">${r.summary.map(s=>`<li>${esc(s)}</li>`).join("")}</ul>
       ${r.llm_summary?.text ? `<div class="notice" style="margin-top:12px">${KIND_TAG.WNIOSEK} <b>Podsumowanie modelu (${esc(r.llm_summary.model)}):</b><br>${esc(r.llm_summary.text)}</div>` : ""}</div>
-    <div class="card"><div class="card-head"><h2>Na co uważać</h2><span class="muted">${r.flags.length} sygnałów</span></div>
-      ${r.flags.length ? r.flags.map(f=>`<div class="flag ${f.level}"><span class="ico">${f.level==="red"?"⛔":"⚠️"}</span><div>${esc(f.text)} ${KIND_TAG[f.kind]||""}<small>podstawa: ${esc(f.basis)}</small></div></div>`).join("") : `<div class="notice ok">Nie wykryto szczególnych sygnałów ostrzegawczych.</div>`}</div>
+    <div class="card"><div class="card-head"><h2>Na co uważać</h2>${cnt(r.flags.length)}</div>
+      ${r.flags.length ? r.flags.map(f=>`<div class="flag ${f.level}">${ic(f.level==="red"?"stop":"alert")}<div>${esc(f.text)} ${KIND_TAG[f.kind]||""}<small>podstawa: ${esc(f.basis)}</small></div></div>`).join("") : `<div class="notice ok">Nie wykryto szczególnych sygnałów ostrzegawczych.</div>`}</div>
   </div>
   <div class="card print-all">
     <div class="tabs" id="rtabs">
-      <button data-tab="risks" class="active">Problemy w podobnych inwestycjach (${r.risks.length})</button>
+      <button data-tab="risks" class="active">Problemy w podobnych inwestycjach${cnt(r.risks.length)}</button>
       <button data-tab="recs">Rekomendacje i zapisy umowne</button>
-      <button data-tab="cases">Podobne inwestycje (${r.comparables.length})</button>
-      <button data-tab="contacts">Do kogo się zwrócić (${r.contacts.length})</button>
+      <button data-tab="cases">Podobne inwestycje${cnt(r.comparables.length)}</button>
+      <button data-tab="contacts">Do kogo się zwrócić${cnt(r.contacts.length)}</button>
       <button data-tab="check">Lista kontrolna</button>
       <button data-tab="forecast">Prognozy – szczegóły</button>
       <button data-tab="method">Parametry i metoda</button>
@@ -279,8 +311,8 @@ function renderRisks(r){
         ${x.catalog_status==="proposed"?tag("nowa kategoria – do zatwierdzenia","warn"):""}<div class="spacer"></div>
         <div class="risk-share">${bar(x.share, x.ci90)}<small>${x.cases} z ${r.sample.n} inwestycji (${pct(x.share)}) · ${x.events} zdarzeń, ${x.approved_events} zatwierdzonych</small></div></div>
       <p class="muted" style="margin:.4rem 0">${esc(x.effects||"")}</p>
-      <div class="row" style="gap:16px;font-size:.88rem">${x.median_time_days?`<span>⏱ typowe wydłużenie: <b>${days(x.median_time_days)}</b></span>`:""}${x.median_cost_pln?`<span>💰 typowa wartość zmiany: <b>${pln(x.median_cost_pln)}</b></span>`:""}
-        ${x.actions_seen?.length?`<span>🛠 podjęte działania: ${x.actions_seen.map(([a,k])=>`${esc(a)} (${k})`).join(", ")}</span>`:""}</div>
+      <div class="facts">${x.median_time_days?`<span>${ic("clock")} typowe wydłużenie: <b>${days(x.median_time_days)}</b></span>`:""}${x.median_cost_pln?`<span>${ic("cost")} typowa wartość zmiany: <b>${pln(x.median_cost_pln)}</b></span>`:""}
+        ${x.actions_seen?.length?`<span>${ic("tool")} podjęte działania: ${x.actions_seen.map(([a,k])=>`${esc(a)} (${k})`).join(", ")}</span>`:""}</div>
       ${x.examples.map(e => `<div class="quote">„${esc(e.quote)}”<div class="meta">${KIND_TAG.DANE} ${esc(e.case_org||"")} – <i>${esc((e.case_title||"").slice(0,100))}</i> ·
         <button class="link-btn" data-ev-notice="${esc(e.source_ref)}" data-ev-quote="${esc((e.quote||"").slice(0,80))}">${esc(e.source_ref)}</button> (${esc(e.locator||"")}) · ${evTag(e.status)}
         ${e.action_effectiveness?` · skuteczność działań: ${esc(e.action_effectiveness)}`:""}</div></div>`).join("")}
@@ -292,7 +324,7 @@ function renderRecs(r){
   const R = r.recommendations;
   return `<div class="grid g3">
     <div><h3>Do uzupełnienia przed przetargiem ${KIND_TAG.WNIOSEK}</h3><p class="muted">Informacje z listy kontrolnej MFiPR, których brakuje w opisie.</p>
-      <ul class="clean">${R.before_tender.map(x=>`<li>☐ ${esc(x.text)}<br><small>${esc(x.ref||"")}</small></li>`).join("") || "<li>Opis zawiera wszystkie kluczowe informacje.</li>"}</ul></div>
+      <ul class="clean check-list">${R.before_tender.map(x=>`<li>${ic("circle","no")}<div>${esc(x.text)}<br><small>${esc(x.ref||"")}</small></div></li>`).join("") || "<li>Opis zawiera wszystkie kluczowe informacje.</li>"}</ul></div>
     <div><h3>Rekomendowane działania ${KIND_TAG.WNIOSEK}</h3><p class="muted">Wynikają z problemów w podobnych inwestycjach.</p>
       <ul class="clean">${R.actions.map(x=>`<li>${esc(x.text)}<br><small>podstawa: ${esc(x.basis)}${x.evidence.length?` · dowody: ${x.evidence.map(n=>`<button class="link-btn" data-ev-notice="${esc(n)}">${esc(n)}</button>`).join(", ")}`:""}</small></li>`).join("") || "<li>—</li>"}</ul></div>
     <div><h3>Propozycje zapisów umownych ${KIND_TAG.WNIOSEK}</h3><p class="muted">Do rozważenia w PPU / SWZ.</p>
@@ -316,14 +348,14 @@ function renderContacts(r){
   <div class="grid g2">${r.contacts.map(x=>`<div class="contact"><h4>${esc(x.org)}</h4><small>${esc(x.city||"")}, woj. ${esc(x.province)} · podobieństwo ${x.similarity_pct||"–"}%</small>
     <p style="margin:.5rem 0">${x.success?tag("sukces: w terminie, bez wzrostu kosztów","ok"):tag("doświadczenie z problemami","warn")} ${esc(x.why)}.</p>
     <p style="margin:.3rem 0"><small>Inwestycja: „${esc((x.case_title||"").slice(0,120))}” (${x.year||""})${x.problems?.length?` · problemy: ${x.problems.filter(c=>c!=="BRAK").map(c=>esc(riskName(c))).join(", ")}`:""}</small></p>
-    <div class="row">${x.mailto?`<a class="btn primary small" href="${esc(x.mailto)}">✉ Napisz e-mail</a>`:""}${x.email?`<span>${esc(x.email)}</span>`:""}${x.phone?`<span>☎ ${esc(x.phone)}</span>`:""}
+    <div class="row">${x.mailto?`<a class="btn primary small" href="${esc(x.mailto)}">${ic("mail")}Napisz e-mail</a>`:""}${x.email?`<span>${esc(x.email)}</span>`:""}${x.phone?`<span class="row" style="gap:4px">${ic("phone")}${esc(x.phone)}</span>`:""}
       ${x.www?`<a href="${esc(/^https?:/.test(x.www)?x.www:"https://"+x.www)}" target="_blank" rel="noopener">strona / BIP</a>`:""}</div></div>`).join("")}</div>`;
 }
 function renderChecklist(r){
   const miss = r.checklist.filter(x=>!x.present).length;
-  return `<p class="muted">Lista kontrolna przygotowania inwestycji na podstawie materiałów eksperckich MFiPR. ✔ – informacja jest w opisie, ☐ – warto ją uzupełnić (brak w opisie nie oznacza, że nie została przygotowana).</p>
+  return `<p class="muted">Lista kontrolna przygotowania inwestycji na podstawie materiałów eksperckich MFiPR. Zaznaczone – informacja jest w opisie; puste kółko – warto ją uzupełnić (brak w opisie nie oznacza, że nie została przygotowana).</p>
   <div class="notice ${miss>4?"warn":"ok"}">W opisie brakuje ${miss} z ${r.checklist.length} pozycji.</div>
-  <ul class="clean">${r.checklist.map(x=>`<li>${x.present?"✔":"☐"} ${esc(x.text)} <small class="muted">(${esc(x.ref||"")})</small></li>`).join("")}</ul>`;
+  <ul class="clean check-list">${r.checklist.map(x=>`<li>${x.present?ic("check-circle","yes"):ic("circle","no")}<div>${esc(x.text)} <small class="muted">(${esc(x.ref||"")})</small></div></li>`).join("")}</ul>`;
 }
 function renderForecast(r){
   const F = r.forecast, t = F.time, c = F.cost, b = F.budget, td = F.tender;
@@ -376,7 +408,7 @@ async function showNotice(num, quote){
     const n = await api(`/api/notice?n=${encodeURIComponent(num)}`);
     let text = esc(n.text || "(brak zapisanej treści – zobacz oryginał w BZP)");
     if(quote){ const q = esc(quote.split("—")[0].trim().slice(0,60)); if(q.length > 8){ const i = text.indexOf(q); if(i >= 0) text = text.slice(0,i) + "<mark id='hl'>" + text.slice(i, i+q.length) + "</mark>" + text.slice(i+q.length); } }
-    $("#modalBody").innerHTML = `<p>${KIND_TAG.DANE} <b>${esc(n.title)}</b><br><small>${esc(n.notice_type)} · opublikowano ${esc(n.pub_date)} · <a href="${esc(n.url)}" target="_blank" rel="noopener">otwórz oryginał w e-Zamówieniach ↗</a></small></p>
+    $("#modalBody").innerHTML = `<p>${KIND_TAG.DANE} <b>${esc(n.title)}</b><br><small>${esc(n.notice_type)} · opublikowano ${esc(n.pub_date)} · <a href="${esc(n.url)}" target="_blank" rel="noopener">otwórz oryginał w e-Zamówieniach ${ic("external")}</a></small></p>
       <div class="srctext">${text}</div>`;
     $("#hl")?.scrollIntoView({block:"center"});
   }catch(e){ $("#modalBody").innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; }
@@ -386,7 +418,7 @@ async function showDocument(id){
   try{
     const d = await api(`/api/documents/${encodeURIComponent(id)}`);
     $("#modalTitle").textContent = d.title;
-    $("#modalBody").innerHTML = `<p>${KIND_TAG.DANE} ${esc(d.source_system)} · ${esc(d.doc_type)} · pobrano ${esc(d.fetched_at)} ${d.url?`· <a href="${esc(d.url)}" target="_blank" rel="noopener">źródło ↗</a>`:""}<br><small>SHA-256: ${esc(d.sha256||"")}</small></p>
+    $("#modalBody").innerHTML = `<p>${KIND_TAG.DANE} ${esc(d.source_system)} · ${esc(d.doc_type)} · pobrano ${esc(d.fetched_at)} ${d.url?`· <a href="${esc(d.url)}" target="_blank" rel="noopener">źródło ${ic("external")}</a>`:""}<br><small>SHA-256: ${esc(d.sha256||"")}</small></p>
       ${d.events.length?`<h4>Fragmenty wskazujące na ryzyko (${d.events.length})</h4>${d.events.slice(0,20).map(e=>`<div class="quote"><b>${esc(e.risk_code)}</b> ${esc(riskName(e.risk_code))}: „${esc(e.quote)}”<div class="meta">${esc(e.locator)} · ${evTag(e.status)}</div></div>`).join("")}`:""}
       <h4>Treść</h4>${d.pages.map(([p,t])=>`<div class="muted">— strona ${p} —</div><div class="srctext" style="max-height:none;margin-bottom:8px">${esc(t)}</div>`).join("")}`;
   }catch(e){ $("#modalBody").innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; }
@@ -398,8 +430,8 @@ async function showCase(tid){
   const o = p.organization || {};
   $("#modalBody").innerHTML = `
     <div class="row" style="margin-bottom:8px">${tag(SUB[p.subsector]||p.sector||"","grey")}${tag(p.status||"","grey")}${p.exemplary?tag("wzorcowy","ok"):""}<div class="spacer"></div>
-      <button class="small" id="exBtn">${p.exemplary?"Usuń oznaczenie wzorcowego":"★ Oznacz jako wzorcowy"}</button>
-      ${tid.startsWith("ocds")?`<a class="btn small" target="_blank" rel="noopener" href="https://ezamowienia.gov.pl/mp-client/search/list/${esc(tid)}">e-Zamówienia ↗</a>`:""}</div>
+      <button class="small" id="exBtn">${p.exemplary?"Usuń oznaczenie wzorcowego":`${ic("star")}Oznacz jako wzorcowy`}</button>
+      ${tid.startsWith("ocds")?`<a class="btn small" target="_blank" rel="noopener" href="https://ezamowienia.gov.pl/mp-client/search/list/${esc(tid)}">${ic("external")}e-Zamówienia</a>`:""}</div>
     <dl class="kv"><dt>Zamawiający</dt><dd>${esc(p.org_name)} (NIP ${esc(p.nip||"—")}) · ${esc(PROV[p.province]||"")} ${o.email?`· ${esc(o.email)}`:""} ${o.phone?`· tel. ${esc(o.phone)}`:""}</dd>
       <dt>Identyfikator postępowania</dt><dd><code>${esc(tid)}</code></dd>
       <dt>Szacunek (netto)</dt><dd>${pln(p.estimated_value_net)}</dd><dt>Wartość umów (brutto)</dt><dd>${pln(p.contract_value)}</dd>
@@ -424,7 +456,7 @@ async function viewProjects(){
   const list = await api("/api/projects");
   app().innerHTML = `
   <div class="page-title"><div><h1>Projekty</h1><p>Projekty z rekordów MFiPR i plików użytkownika, automatycznie powiązane z ogłoszeniami BZP, TED, orzeczeniami KIO i dokumentami z BIP.</p></div>
-    <div class="row"><a class="btn" href="/api/export/projects">⬇ Eksport wszystkich (JSON)</a><a class="btn primary" href="#/import">+ Importuj projekty</a></div></div>
+    <div class="row"><a class="btn" href="/api/export/projects">${ic("download")}Eksport (JSON)</a><a class="btn primary" href="#/import">${ic("upload")}Importuj projekty</a></div></div>
   ${list.length ? `<div class="card"><div class="table-wrap"><table><thead><tr><th>ID</th><th>Przedsięwzięcie</th><th>Odbiorca</th><th>Identyfikator</th><th>Powiązania BZP</th><th>Przebieg</th><th>Zdarzenia ryzyka</th><th>Dane</th></tr></thead><tbody>
   ${list.map(p => { const s = p.summary || {};
     return `<tr class="click" data-pid="${esc(p.project_id)}"><td><code>${esc(p.project_id)}</code></td><td><b>${esc(p.title)}</b><br><small>${esc(SUB[p.subsector]||"")} ${p.programme?"· "+esc(p.programme):""}</small></td>
@@ -443,10 +475,10 @@ async function viewProject(pid){
   const p = rec.project, s = p.summary || {};
   const links = rec.links;
   app().innerHTML = `
-  <div class="page-title"><div><a href="#/projekty">← Projekty</a><h1>${esc(p.title)}</h1><p><code>${esc(p.project_id)}</code> · ${esc(p.org_name)} · ${esc(PROV[p.province]||"")} · ${esc(p.public_id_type)}: <b>${esc(p.public_id)}</b></p></div>
-    <div class="row"><button id="enrich" class="primary">⟳ Wzbogać ponownie</button>
-      <a class="btn" href="/api/projects/${encodeURIComponent(pid)}/export?format=json">⬇ JSON</a><a class="btn" href="/api/projects/${encodeURIComponent(pid)}/export?format=md">⬇ Raport (MD)</a>
-      <a class="btn" href="/api/projects/${encodeURIComponent(pid)}/export?format=csv">⬇ CSV</a></div></div>
+  <div class="page-title"><div><a class="crumb" href="#/projekty">Projekty</a><h1>${esc(p.title)}</h1><p><code>${esc(p.project_id)}</code> · ${esc(p.org_name)} · ${esc(PROV[p.province]||"")} · ${esc(p.public_id_type)}: <b>${esc(p.public_id)}</b></p></div>
+    <div class="row"><button id="enrich" class="primary">${ic("sync")}Wzbogać ponownie</button>
+      <a class="btn" href="/api/projects/${encodeURIComponent(pid)}/export?format=json">${ic("download")}JSON</a><a class="btn" href="/api/projects/${encodeURIComponent(pid)}/export?format=md">${ic("download")}Markdown</a>
+      <a class="btn" href="/api/projects/${encodeURIComponent(pid)}/export?format=csv">${ic("download")}CSV</a></div></div>
   <div id="jobbox"></div>
   <div class="grid g4" style="margin-bottom:16px">
     <div class="metric"><div class="lbl">Postępowania BZP</div><div class="val">${s.procedures??"–"}</div><div class="sub">${s.contracts??0} umów · ${s.changes??0} zmian</div></div>
@@ -455,13 +487,13 @@ async function viewProject(pid){
     <div class="metric ${s.pending_events?"warn":""}"><div class="lbl">Zdarzenia ryzyka</div><div class="val">${s.events??0}</div><div class="sub">${s.pending_events??0} czeka na weryfikację</div></div>
   </div>
   <div class="card">
-    <div class="tabs" id="ptabs"><button data-tab="links" class="active">Powiązania ze źródłami (${links.length})</button><button data-tab="course">Przebieg (${rec.procedures.length})</button>
-      <button data-tab="events">Zdarzenia ryzyka (${rec.risk_events.length})</button><button data-tab="docs">Dokumenty (${rec.documents.length})</button><button data-tab="data">Braki i walidacja${(s.gaps||[]).length?` (${s.gaps.length})`:""}</button><button data-tab="hist">Historia</button></div>
+    <div class="tabs" id="ptabs"><button data-tab="links" class="active">Powiązania ze źródłami${cnt(links.length)}</button><button data-tab="course">Przebieg${cnt(rec.procedures.length)}</button>
+      <button data-tab="events">Zdarzenia ryzyka${cnt(rec.risk_events.length)}</button><button data-tab="docs">Dokumenty${cnt(rec.documents.length)}</button><button data-tab="data">Braki i walidacja${(s.gaps||[]).length?cnt(s.gaps.length):""}</button><button data-tab="hist">Historia</button></div>
     <div data-tabpane="links">${renderLinks(links)}</div>
     <div data-tabpane="course" hidden>${rec.procedures.map(renderProcedure).join("") || `<div class="empty">Brak powiązanych postępowań.</div>`}</div>
     <div data-tabpane="events" hidden>${renderEventList(rec.risk_events, true)}</div>
     <div data-tabpane="docs" hidden>
-      <div class="drop" id="docDrop"><div class="big">📎</div><b>Dodaj dokument do projektu</b><br><small>PDF, DOCX, DOC, XLSX, TXT – np. aneks, protokół, umowa, wystąpienie pokontrolne. System znajdzie fragmenty wskazujące na ryzyko (ze stroną).</small><input type="file" id="docIn" hidden></div>
+      <div class="drop" id="docDrop">${ic("clip","lg")}<h3>Dodaj dokument do projektu</h3><br><small>PDF, DOCX, DOC, XLSX, TXT – np. aneks, protokół, umowa, wystąpienie pokontrolne. System znajdzie fragmenty wskazujące na ryzyko (ze stroną).</small><input type="file" id="docIn" hidden></div>
       <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Źródło</th><th>Typ</th><th>Tytuł</th><th>Pobrano</th><th>Znaki</th></tr></thead><tbody>
       ${rec.documents.map(d=>`<tr class="click" data-doc="${esc(d.doc_id)}"><td>${esc(d.source_system)}</td><td>${esc(d.doc_type)}</td><td>${esc(d.title)}</td><td>${esc((d.fetched_at||"").slice(0,16))}</td><td class="num">${(d.chars||0).toLocaleString("pl-PL")}</td></tr>`).join("")||`<tr><td colspan="5" class="muted">brak dokumentów</td></tr>`}</tbody></table></div></div>
     <div data-tabpane="data" hidden>
@@ -495,7 +527,7 @@ function renderLinks(links){
       <br><small>${(l.evidence||[]).map(esc).join(" · ")}</small></td><td>${esc(l.match_basis)}</td>
     <td><div class="bar" style="width:80px"><span style="width:${l.confidence*100}%"></span></div><small>${(l.confidence*100).toFixed(0)}%</small></td>
     <td>${tag(...(LINK_ST[l.status]||[l.status,"grey"]))}</td>
-    <td class="no-print">${l.target_type!=="missing"?`<div class="row" style="flex-wrap:nowrap"><button class="small ok-btn" data-link="${l.link_id}" data-act="approve" title="Potwierdź powiązanie">✓</button><button class="small bad-btn" data-link="${l.link_id}" data-act="reject" title="Odrzuć powiązanie">✕</button></div>`:""}</td></tr>`).join("")}</tbody></table></div>`;
+    <td class="no-print">${l.target_type!=="missing"?`<div class="row" style="flex-wrap:nowrap"><button class="small ok-btn" data-link="${l.link_id}" data-act="approve" title="Potwierdź powiązanie">${ic("check")}</button><button class="small bad-btn" data-link="${l.link_id}" data-act="reject" title="Odrzuć powiązanie">${ic("x")}</button></div>`:""}</td></tr>`).join("")}</tbody></table></div>`;
 }
 function renderProcedure(pr){
   return `<div class="card flat"><div class="card-head"><h3><button class="link-btn" data-case="${esc(pr.tender_id)}">${esc(pr.title)}</button></h3>${tag(pr.status||"","grey")}</div>
@@ -513,13 +545,13 @@ function renderEventList(evs, compact){
     ${e.case_title?`<div style="margin-top:4px"><button class="link-btn" data-case="${esc(e.tender_id)}">${esc(e.case_title)}</button> <small class="muted">${esc(e.case_org||"")} ${e.case_year||""}</small></div>`:""}
     <div class="quote">„${esc(e.quote||"")}”<div class="meta">${KIND_TAG.DANE} źródło: ${e.source_ref?`<button class="link-btn" data-ev-notice="${esc(e.doc_id||e.source_ref)}" data-ev-quote="${esc((e.quote||"").slice(0,60))}">${esc(e.source_ref)}</button>`:""} ${esc(e.locator||"")}
       ${e.matched_terms?.length?` · dopasowane frazy: <i>${e.matched_terms.map(esc).join(", ")}</i>`:""}</div></div>
-    <div class="row" style="font-size:.86rem">${e.effect_types?.length?`<span>skutek: <b>${e.effect_types.map(esc).join(", ")}</b></span>`:""}${e.effect_time_days?`<span>⏱ ${days(e.effect_time_days)}</span>`:""}${e.effect_cost_pln?`<span>💰 ${pln(e.effect_cost_pln)}</span>`:""}
+    <div class="row" style="font-size:.86rem">${e.effect_types?.length?`<span>skutek: <b>${e.effect_types.map(esc).join(", ")}</b></span>`:""}${e.effect_time_days?`<span class="row" style="gap:4px">${ic("clock")}${days(e.effect_time_days)}</span>`:""}${e.effect_cost_pln?`<span class="row" style="gap:4px">${ic("cost")}${pln(e.effect_cost_pln)}</span>`:""}
       ${e.actions?.length?`<span>działania: ${e.actions.map(esc).join(", ")}</span>`:""}${e.action_effectiveness?`<span>skuteczność: ${esc(e.action_effectiveness)}</span>`:""}</div>
     <div class="row no-print" style="margin-top:8px">
-      <button class="small ok-btn" data-ev="${e.event_id}" data-act="approve">✓ Zatwierdź</button>
+      <button class="small ok-btn" data-ev="${e.event_id}" data-act="approve">${ic("check")}Zatwierdź</button>
       <select class="small" style="width:auto;max-width:330px" data-code-for="${e.event_id}">${opts(e.risk_code)}</select>
-      <button class="small" data-ev="${e.event_id}" data-act="correct">✎ Zmień kategorię</button>
-      <button class="small bad-btn" data-ev="${e.event_id}" data-act="reject">✕ Odrzuć</button>
+      <button class="small" data-ev="${e.event_id}" data-act="correct">${ic("pencil")}Zmień kategorię</button>
+      <button class="small bad-btn" data-ev="${e.event_id}" data-act="reject">${ic("x")}Odrzuć</button>
       <label class="check" style="font-size:.85rem"><input type="checkbox" data-exemplary="${e.event_id}" ${e.exemplary?"checked":""}> wzorcowe</label>
       <input class="small" style="flex:1;min-width:160px" placeholder="komentarz eksperta (opcjonalnie)" data-comment="${e.event_id}" value="${esc(e.expert_comment||"")}">
     </div></div>`).join("");
@@ -538,15 +570,16 @@ function bindDecisions(root, after){
   });
 }
 
-function followJob(jid, box, done){
+function followJob(jid, box, done, onResult, onError){
   box.innerHTML = `<div class="card"><div class="card-head"><h3><span class="spinner dark"></span> Trwa przetwarzanie…</h3></div><div class="joblog" id="jl">uruchamiam…</div></div>`;
   const tick = async () => {
     try{
       const j = await api(`/api/jobs/${jid}`);
       const jl = $("#jl", box); if(jl){ jl.textContent = j.log.join("\n"); jl.scrollTop = jl.scrollHeight; }
       if(j.status === "running") return setTimeout(tick, 1200);
-      box.querySelector("h3").innerHTML = j.status === "done" ? "✔ Zakończono" : "⚠ Zakończono z błędem";
-      if(j.status === "done"){ toast("Zakończono"); refreshStatus(); done && setTimeout(done, 700); }
+      box.querySelector("h3").innerHTML = j.status === "done" ? `${ic("check-circle","yes")} Zakończono` : `${ic("alert")} Zakończono z błędem`;
+      if(j.status === "done"){ toast("Zakończono"); refreshStatus(); done && setTimeout(done, 700); onResult && onResult(j.result); }
+      else { onError && onError(j); }
     }catch(e){ setTimeout(tick, 2500); }
   };
   tick();
@@ -557,7 +590,7 @@ async function viewCases(){
   if(!CATALOG) await loadCatalog().catch(()=>{});
   app().innerHTML = `
   <div class="page-title"><div><h1>Baza inwestycji</h1><p>Wszystkie postępowania z BZP i innych źródeł z wynikami realizacji. Filtruj, przeglądaj przebieg i eksportuj do Excela.</p></div>
-    <a class="btn" id="expCases" href="#">⬇ Eksport wyników (CSV)</a></div>
+    <a class="btn" id="expCases" href="#">${ic("download")}Eksport wyników (CSV)</a></div>
   <div class="card"><div class="form-grid">
     <div style="grid-column:span 2"><label class="field">Szukaj w nazwach i opisach</label><input id="f_q" placeholder="np. przepompownia przewiert Kłodzko"></div>
     <div><label class="field">Podsektor</label><select id="f_sub"><option value="">wszystkie</option>${Object.entries(SUB).map(([k,n])=>`<option value="${k}">${n}</option>`).join("")}</select></div>
@@ -594,7 +627,7 @@ async function viewExpert(tab = "events"){
   await loadCatalog();
   app().innerHTML = `
   <div class="page-title"><div><h1>Weryfikacja ekspercka</h1><p>Każde zdarzenie i powiązanie zaproponowane automatycznie może zostać zatwierdzone, poprawione lub odrzucone. Decyzje są zapisywane z historią i wykorzystywane w kolejnych analizach.</p></div>
-    <div class="row"><a class="btn" href="/api/export/events">⬇ Eksport zdarzeń (CSV)</a><button id="reanalyze">⟳ Ponowna analiza (nowe reguły)</button></div></div>
+    <div class="row"><a class="btn" href="/api/export/events">${ic("download")}Eksport zdarzeń (CSV)</a><button id="reanalyze">${ic("sync")}Ponowna analiza (nowe reguły)</button></div></div>
   <div id="jobbox"></div>
   <div class="card"><div class="tabs" id="etabs">
     <button data-tab="events">Zdarzenia ryzyka</button><button data-tab="links">Niepewne powiązania</button><button data-tab="catalog">Katalog ryzyk</button>
@@ -631,18 +664,18 @@ const EXPERT_TABS = {
       ${r.items.map(l=>`<tr><td><a href="#/projekt/${encodeURIComponent(l.project_id)}">${esc(l.project_id)}</a><br><small>${esc(l.project_title)}</small><br><small>${esc(l.project_org)} · ${esc(l.public_id||"")}</small></td>
         <td>${l.target_type==="procedure"?`<button class="link-btn" data-case="${esc(l.target_id)}">${esc(l.title||l.target_id)}</button><br><small>${esc(l.target_org||"")} · ${l.target_year||""} · ${pln(l.target_value)}</small>`:esc(l.title||l.target_id)}</td>
         <td>${esc(l.match_basis)}<br><small>${(l.evidence||[]).map(esc).join(" · ")}</small></td><td>${(l.confidence*100).toFixed(0)}%</td>
-        <td><div class="row" style="flex-wrap:nowrap">${l.target_type!=="missing"?`<button class="small ok-btn" data-link="${l.link_id}" data-act="approve">✓ Zatwierdź</button><button class="small bad-btn" data-link="${l.link_id}" data-act="reject">✕ Odrzuć</button>`:tag("brak dopasowania","bad")}</div></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">Brak niepewnych powiązań. 👍</div>`);
+        <td><div class="row" style="flex-wrap:nowrap">${l.target_type!=="missing"?`<button class="small ok-btn" data-link="${l.link_id}" data-act="approve">${ic("check")}Zatwierdź</button><button class="small bad-btn" data-link="${l.link_id}" data-act="reject">${ic("x")}Odrzuć</button>`:tag("brak dopasowania","bad")}</div></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">Brak niepewnych powiązań.</div>`);
     bindDecisions(el, () => EXPERT_TABS.links(el)); $$("[data-case]", el).forEach(x => x.onclick = () => showCase(x.dataset.case));
   },
   async catalog(el){
     const cat = await loadCatalog();
     el.innerHTML = `<p class="muted">Katalog jest otwarty: system proponuje nowe kategorie (oznaczone „propozycja”), a ekspert je zatwierdza, odrzuca lub edytuje. Wzorce to wyrażenia rozpoznające ryzyko w tekście (małe litery, bez polskich znaków).
       Po zmianie wzorców użyj „Ponowna analiza”, aby zastosować je do danych – decyzje eksperta zostaną zachowane.</p>
-      <div class="row" style="margin-bottom:10px"><button class="primary" id="newCat">+ Dodaj kategorię</button></div>
+      <div class="row" style="margin-bottom:10px"><button class="primary" id="newCat">${ic("plus")}Dodaj kategorię</button></div>
       <div class="table-wrap"><table><thead><tr><th>Kod</th><th>Nazwa</th><th>Status</th><th>Zdarzeń</th><th>Zatwierdzonych</th><th></th></tr></thead><tbody>
       ${cat.map(c=>`<tr><td><b>${esc(c.code)}</b></td><td>${esc(c.name)}<br><small>${esc(c.effects||"")}</small></td><td>${c.status==="proposed"?tag("propozycja systemu","warn"):c.status==="active"?tag("aktywna","ok"):tag(c.status,"bad")}</td>
         <td class="num">${c.events.toLocaleString("pl-PL")}</td><td class="num">${c.approved}</td>
-        <td><div class="row" style="flex-wrap:nowrap">${c.status==="proposed"?`<button class="small ok-btn" data-cat-act="active" data-code="${c.code}">✓ Zatwierdź</button><button class="small bad-btn" data-cat-act="rejected" data-code="${c.code}">✕</button>`:""}<button class="small" data-edit="${c.code}">✎ Edytuj</button></div></td></tr>`).join("")}</tbody></table></div><div id="catEdit"></div>`;
+        <td><div class="row" style="flex-wrap:nowrap">${c.status==="proposed"?`<button class="small ok-btn" data-cat-act="active" data-code="${c.code}">${ic("check")}Zatwierdź</button><button class="small bad-btn" data-cat-act="rejected" data-code="${c.code}" title="Odrzuć">${ic("x")}</button>`:""}<button class="small" data-edit="${c.code}">${ic("pencil")}Edytuj</button></div></td></tr>`).join("")}</tbody></table></div><div id="catEdit"></div>`;
     const edit = code => {
       const c = cat.find(x=>x.code===code) || {code:"", name:"", status:"active", effects:"", patterns:[], mitigations:[], clauses:[], checklist:[]};
       $("#catEdit").innerHTML = `<div class="card" style="margin-top:14px"><h3>${code?"Edycja kategorii "+esc(code):"Nowa kategoria"}</h3><div class="form-grid">
@@ -689,17 +722,97 @@ const EXPERT_TABS = {
   },
 };
 
+/* ================================================================ PRZETWÓRZ PLIKI (pakiet: rekord projektu + opis inwestycji) */
+const fileB64 = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res({name:f.name, b64:String(r.result).split(",")[1]}); r.onerror = rej; r.readAsDataURL(f); });
+const kb = n => n >= 1048576 ? (n/1048576).toLocaleString("pl-PL",{maximumFractionDigits:1}) + " MB" : Math.max(1, Math.round(n/1024)) + " kB";
+async function viewProcess(){
+  const L = S.llm || {};
+  app().innerHTML = `
+  <div class="page-title"><div><h1>Przetwórz pliki</h1>
+    <p>Dodaj rekord projektu i/lub opis nowej inwestycji. System wykona cały proces bez dodatkowych kroków i przygotuje pliki wyników:
+    <b>eksport rekordu projektu</b> (powiązania z BZP, TED, KIO, BIP, NIK, przebieg, zdarzenia ryzyka z dowodami) oraz <b>analizę nowej inwestycji</b>
+    (podobne inwestycje, prognozy, ryzyka, rekomendacje, kontakty).</p></div></div>
+  <div class="grid g2">
+    <div class="card"><div class="card-head"><h2>1. Rekord projektu</h2><span class="muted">XLSX, XLS, CSV</span></div>
+      <div class="drop" id="dropP">${ic("projects","lg")}<h3 id="nameP">Przeciągnij plik albo kliknij</h3><p class="muted" style="margin:0">Układ jak w rekordach MFiPR – kolumny są rozpoznawane automatycznie.</p></div>
+      <input type="file" id="inP" hidden accept=".xlsx,.xls,.csv,.ods"></div>
+    <div class="card"><div class="card-head"><h2>2. Opis nowej inwestycji</h2><span class="muted">DOCX, PDF, TXT</span></div>
+      <div class="drop" id="dropI">${ic("file","lg")}<h3 id="nameI">Przeciągnij plik albo kliknij</h3><p class="muted" style="margin:0">Kilka stron tekstu – opis, notatka, fragment wniosku.</p></div>
+      <input type="file" id="inI" hidden accept=".docx,.doc,.pdf,.txt,.odt,.rtf,.md,.html">
+      <details style="margin-top:8px"><summary>albo wklej tekst opisu</summary><textarea id="txtI" style="min-height:140px" placeholder="Treść opisu nowej inwestycji…"></textarea></details></div>
+  </div>
+  <div class="card"><div class="row">
+    <label class="check"><input type="checkbox" id="optExt" checked> przeszukaj źródła zewnętrzne (TED, KIO, BIP, NIK) – dokładniej, ok. 1–2 min</label>
+    <div class="spacer"></div><span class="muted">${L.enabled ? `Opis odczyta model ${esc(L.model)} ${L.online ? "" : "(niedostępny – reguły)"}` : "Opis odczytają reguły eksperckie"}</span>
+    <button class="primary btn-lg" id="runP">${ic("sync")}Przetwórz i przygotuj pliki</button></div></div>
+  <div id="jobbox"></div><div id="procResult"></div>
+  <div class="card"><div class="card-head"><h2>Poprzednie przebiegi</h2></div><div id="prevRuns"><div class="empty"><span class="spinner dark"></span></div></div></div>`;
+  const pick = {P:null, I:null};
+  const bindDrop = (k, accept) => {
+    const drop = $("#drop"+k), inp = $("#in"+k);
+    const set = f => { pick[k] = f; $("#name"+k).innerHTML = `${ic("check-circle","yes")} ${esc(f.name)} <span class="muted" style="font-weight:400">(${kb(f.size)})</span>`; drop.classList.add("on"); };
+    drop.onclick = () => inp.click();
+    ["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("on"); }));
+    ["dragleave"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); if(!pick[k]) drop.classList.remove("on"); }));
+    drop.addEventListener("drop", e => { e.preventDefault(); if(e.dataTransfer.files[0]) set(e.dataTransfer.files[0]); });
+    inp.onchange = e => { if(e.target.files[0]) set(e.target.files[0]); };
+  };
+  bindDrop("P"); bindDrop("I");
+  const loadPrev = async () => {
+    const runs = await api("/api/results");
+    $("#prevRuns").innerHTML = runs.length ? `<div class="table-wrap"><table><thead><tr><th>Przebieg</th><th>Pliki</th></tr></thead><tbody>${runs.map(r=>`<tr><td><code>${esc(r.run)}</code></td>
+      <td>${r.files.map(f=>`<a href="/api/results/${esc(r.run)}/${esc(f.name)}">${esc(f.name)}</a> <small>${kb(f.size)}</small>`).join("<br>")}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">Brak poprzednich przebiegów.</div>`;
+  };
+  loadPrev();
+  $("#runP").onclick = async () => {
+    const text = $("#txtI").value.trim();
+    if(!pick.P && !pick.I && text.length < 15){ toast("Dodaj rekord projektu i/lub opis inwestycji."); return; }
+    const btn = $("#runP"); btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Przetwarzanie…`;
+    try{
+      const body = {external: $("#optExt").checked, text};
+      if(pick.P) body.project = await fileB64(pick.P);
+      if(pick.I) body.investment = await fileB64(pick.I);
+      const r = await api("/api/process", {json: body});
+      followJob(r.job, $("#jobbox"), null, res => { showProcessResult(res); loadPrev(); btn.disabled = false; btn.innerHTML = `${ic("sync")}Przetwórz ponownie`; },
+        () => { btn.disabled = false; btn.innerHTML = `${ic("sync")}Spróbuj ponownie`; });
+    }catch(e){ toast(e.message, 6000); btn.disabled = false; btn.innerHTML = `${ic("sync")}Przetwórz i przygotuj pliki`; }
+  };
+}
+function showProcessResult(res){
+  const f = res.files || [], main = f.filter(x=>x.main), rest = f.filter(x=>!x.main);
+  const link = x => `/api/results/${esc(res.run)}/${esc(x.name)}`;
+  $("#procResult").innerHTML = `<div class="card"><div class="card-head"><h2>${ic("check-circle","yes")} Pliki wyników gotowe</h2>
+      <a class="btn primary" href="${link({name:res.zip})}">${ic("download")}Pobierz wszystko (ZIP)</a></div>
+    <ul class="clean">${main.map(x=>`<li class="row"><a class="btn" href="${link(x)}">${ic("download")}${esc(x.name)}</a><span>${esc(x.label)}</span><span class="muted">${kb(x.size)}</span></li>`).join("")}</ul>
+    <details><summary>Te same wyniki w innych formatach (${rest.length})</summary><ul class="clean">${rest.map(x=>`<li class="row"><a href="${link(x)}">${esc(x.name)}</a><span class="muted">${esc(x.label)} · ${kb(x.size)}</span></li>`).join("")}</ul></details>
+    <div class="row" style="margin-top:12px">${(res.projects||[]).map(p=>`<a class="btn" href="#/projekt/${encodeURIComponent(p.project_id)}">${ic("projects")}Otwórz projekt ${esc(p.project_id)}</a>`).join("")}
+      ${res.analysis?`<a class="btn" href="#/raport/${esc(res.analysis.analysis_id)}">${ic("search")}Otwórz raport analizy</a>`:""}</div>
+    <p class="muted" style="margin:12px 0 0">Folder na dysku: <code>${esc(res.dir)}</code></p></div>`;
+}
+
 /* ================================================================ IMPORT */
 async function viewImport(){
   app().innerHTML = `
   <div class="page-title"><div><h1>Import danych</h1><p>Przeciągnij plik – system sam rozpozna, co to jest. Tabele projektów zostaną zaimportowane i automatycznie powiązane z danymi publicznymi; dokumenty – przeanalizowane pod kątem ryzyk.</p></div></div>
   <div class="grid" style="grid-template-columns:minmax(0,2fr) minmax(0,1fr)">
     <div>
-      <div class="card"><div class="drop" id="drop"><div class="big">⬆</div><h3>Przeciągnij plik tutaj lub kliknij, aby wybrać</h3>
+      <div class="card"><div class="drop" id="drop">${ic("upload","lg")}<h3>Przeciągnij plik tutaj lub kliknij, aby wybrać</h3>
         <p class="muted">Tabela projektów: <b>XLSX, XLS, CSV</b> (np. rekordy MFiPR) · Dokumenty: <b>PDF, DOCX, DOC, ODT, TXT, HTML</b></p><input type="file" id="fin" hidden multiple></div>
         <div class="row" style="margin-top:12px"><label class="check"><input type="checkbox" id="o_enrich" checked> automatycznie wzbogać projekty (BZP, TED, KIO, BIP, NIK)</label>
           <label class="check"><input type="checkbox" id="o_ext" checked> przeszukaj źródła zewnętrzne (wolniej)</label></div></div>
       <div id="jobbox"></div><div id="importResult"></div>
+      <div class="card"><div class="card-head"><h2>Dodaj dane z BIP</h2><span class="muted">strona BIP, protokół, aneks, zarządzenie</span></div>
+        <p class="muted" style="margin-top:0">Wklej adres strony z Biuletynu Informacji Publicznej (albo bezpośredni link do PDF/DOCX). System pobierze stronę
+          i jej załączniki, zapisze je z adresem źródła i znajdzie fragmenty wskazujące na ryzyko – z numerem strony, do weryfikacji eksperta.</p>
+        <label class="field" for="bipUrls">Adresy stron BIP (jeden w wierszu)</label>
+        <textarea id="bipUrls" style="min-height:72px" placeholder="https://bip.gmina.pl/…/informacja-z-otwarcia-ofert&#10;https://bip.gmina.pl/…/aneks-nr-2.pdf"></textarea>
+        <details style="margin:8px 0"><summary>albo wklej treść skopiowaną ze strony BIP</summary>
+          <input id="bipTitle" placeholder="Tytuł (np. Zarządzenie nr 12/2025 Wójta Gminy…)" style="margin-bottom:8px"><textarea id="bipText" style="min-height:120px" placeholder="Treść strony lub dokumentu…"></textarea></details>
+        <div class="form-grid" style="margin-top:8px">
+          <div><label class="field" for="bipProj">Przypnij do projektu (opcjonalnie)</label><select id="bipProj"><option value="">— bez projektu —</option></select></div>
+          <div><label class="field">&nbsp;</label><label class="check"><input type="checkbox" id="bipAtt" checked> pobierz też załączniki ze strony</label></div></div>
+        <div class="row" style="margin-top:12px"><div class="spacer"></div><button class="primary" id="bipGo">${ic("download")}Pobierz i przeanalizuj</button></div>
+        <div id="bipBox"></div><div id="bipResult"></div></div>
     </div>
     <div>
       <div class="help"><h4>Co dzieje się po imporcie tabeli?</h4><ol style="margin:.3rem 0 0 1.1rem;padding:0;font-size:.9rem">
@@ -708,9 +821,9 @@ async function viewImport(){
         <li>Pobranie wszystkich ogłoszeń postępowania: wynik, umowy, zmiany, wykonanie.</li><li>Wyszukanie w TED, KIO, BIP zamawiającego i NIK.</li>
         <li>Rozpoznanie zdarzeń ryzyka z dowodami – do weryfikacji eksperta.</li></ol></div>
       <div class="card" style="margin-top:12px"><h3>Monitorowanie inwestycji</h3><p class="muted">Sprawdza, czy dla trwających postępowań pojawiły się nowe ogłoszenia (zmiana lub wykonanie umowy) i aktualizuje analizę.</p>
-        <button id="mon" class="primary">⟳ Sprawdź nowe ogłoszenia</button><div id="monList" style="margin-top:10px"></div></div>
+        <button id="mon">${ic("sync")}Sprawdź nowe ogłoszenia</button><div id="monList" style="margin-top:10px"></div></div>
       <div class="card"><h3>Źródła zewnętrzne</h3><p class="muted">Wczytaj zasoby pobrane przez harvestery (orzeczenia KIO, ogłoszenia TED, BZP z innych sektorów, KPOŚK).</p>
-        <button id="extras">⬇ Wczytaj źródła z data_lake</button></div>
+        <button id="extras">${ic("download")}Wczytaj źródła z data_lake</button></div>
     </div>
   </div>
   <div class="card"><h3>Rejestr operacji i źródeł</h3><div id="srcTable"></div></div>`;
@@ -725,6 +838,20 @@ async function viewImport(){
   $("#mon").onclick = async () => { const r = await api("/api/monitor", {json:{}}); followJob(r.job, $("#jobbox"), loadMon); };
   const loadMon = async () => { const ev = await api("/api/monitor"); $("#monList").innerHTML = ev.length ? `<ul class="clean">${ev.map(e=>`<li>${esc(e.ts.slice(0,16))} · <b>${esc(e.kind)}</b> ${esc(e.notice_number)} ${e.project_id?`· <a href="#/projekt/${esc(e.project_id)}">${esc(e.project_id)}</a>`:""}<br><small>${esc(e.summary||"")}</small></li>`).join("")}</ul>` : `<small class="muted">Brak nowych zdarzeń monitoringu.</small>`; };
   loadMon();
+  api("/api/projects").then(ps => { $("#bipProj").insertAdjacentHTML("beforeend", ps.map(p=>`<option value="${esc(p.project_id)}">${esc(p.project_id)} – ${esc((p.title||"").slice(0,70))}</option>`).join("")); }).catch(()=>{});
+  $("#bipGo").onclick = async () => {
+    const body = {urls:$("#bipUrls").value, text:$("#bipText").value, title:$("#bipTitle").value, project_id:$("#bipProj").value, attachments:$("#bipAtt").checked};
+    try{
+      const r = await api("/api/bip", {json: body});
+      followJob(r.job, $("#bipBox"), null, res => {
+        $("#bipResult").innerHTML = `<div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Dokument</th><th>Rodzaj</th><th>Strony</th><th>Fragmenty ryzyka</th></tr></thead><tbody>
+          ${res.documents.map(d=>`<tr class="click" data-doc="${esc(d.doc_id)}"><td><b>${esc(d.title)}</b><br><small>${esc(d.url||"")}</small></td><td>${esc(d.kind)}</td><td class="num">${d.pages}</td>
+          <td class="num">${d.events ? tag(d.events + " do weryfikacji","warn") : tag("brak","grey")}</td></tr>`).join("")}</tbody></table></div>
+          ${res.errors?.length ? `<div class="flag amber" style="margin-top:8px">${ic("alert")}<div>${res.errors.map(esc).join("<br>")}</div></div>` : ""}`;
+        $$("tr[data-doc]", $("#bipResult")).forEach(tr => tr.onclick = () => showDocument(tr.dataset.doc));
+      });
+    }catch(e){ toast(e.message, 6000); }
+  };
   const src = await api("/api/sources");
   $("#srcTable").innerHTML = `<div class="table-wrap" style="max-height:340px"><table><thead><tr><th>Czas</th><th>Źródło</th><th>Operacja</th><th>Rekordów</th><th>Adres</th></tr></thead><tbody>
     ${src.map(s=>`<tr><td>${esc((s.finished_at||"").slice(0,16))}</td><td>${esc(s.source_system)}</td><td>${esc(s.operation)}</td><td class="num">${s.records??""}</td><td><small>${esc((s.url||"").slice(0,80))}</small></td></tr>`).join("")}</tbody></table></div>`;
@@ -736,7 +863,7 @@ async function uploadOne(f){
     const r = await api(`/api/upload?enrich=${enrich}&external=${ext}`, {method:"POST", body:f, headers:{"X-Filename":encodeURIComponent(f.name)}});
     if(r.kind === "table"){
       $("#importResult").innerHTML = `<div class="notice ok"><b>Zaimportowano ${r.imported.length} projektów</b> z pliku ${esc(f.name)}. Rozpoznane kolumny: ${Object.entries(r.columns).map(([k,v])=>`<code>${esc(v)}</code>`).join(", ")}.
-        <br><a href="#/projekty">Zobacz projekty →</a></div>`;
+        <br><a href="#/projekty">Zobacz projekty</a></div>`;
       if(r.job) followJob(r.job, $("#jobbox"));
     } else {
       $("#importResult").innerHTML = `<div class="notice ok"><b>Dodano dokument ${esc(f.name)}</b>: ${r.pages} str., ${r.chars.toLocaleString("pl-PL")} znaków; znaleziono ${r.events} fragmentów wskazujących na ryzyko (czekają na weryfikację eksperta).
@@ -776,8 +903,7 @@ async function viewAbout(){
 }
 
 /* ---------------------------------------------------------------- start */
-refreshStatus();
 loadCatalog().catch(()=>{});
-route();
+refreshStatus().finally(route);
 setInterval(refreshStatus, 60000);
 })();

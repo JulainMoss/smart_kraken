@@ -96,34 +96,76 @@ def chat_json(system: str, user: str, schema: dict | None = None) -> dict:
         return json.loads(m.group(0)) if m else {}
 
 
-QUERY_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "zamawiajacy": {"type": "string"}, "miejscowosc": {"type": "string"}, "wojewodztwo": {"type": "string"},
-        "podsektor": {"type": "string", "enum": ["siec_wod", "kan_san", "oczyszczalnia", "suw", "deszcz", "inne_wk", "inny_sektor"]},
-        "rodzaj_robot": {"type": "string", "enum": ["budowa", "rozbudowa", "przebudowa", "modernizacja", "remont/renowacja", ""]},
-        "zaprojektuj_i_wybuduj": {"type": "boolean"},
-        "kwota_pln": {"type": "number"}, "kwota_vat": {"type": "string", "enum": ["netto", "brutto", "nieokreślone"]},
-        "czas_miesiace": {"type": "number"}, "dlugosc_km": {"type": "number"}, "liczba_przylaczy": {"type": "number"},
-        "elementy": {"type": "array", "items": {"type": "string"}},
-        "ryzyka_wspomniane": {"type": "array", "items": {"type": "string"}},
-        "streszczenie": {"type": "string"},
-    },
-    "required": ["podsektor", "streszczenie"],
+SUBSECTOR_LABELS = {
+    "kanalizacja sanitarna": "kan_san", "sieć wodociągowa": "siec_wod", "oczyszczalnia ścieków": "oczyszczalnia",
+    "stacja uzdatniania wody / ujęcie / zbiornik": "suw", "kanalizacja deszczowa / retencja": "deszcz",
+    "inny obiekt wodno-kanalizacyjny": "inne_wk", "inny sektor (drogi, budynki, energetyka…)": "",
 }
-
-QUERY_SYSTEM = """Jesteś ekspertem inwestycji publicznych w Polsce (sektor wodno-kanalizacyjny i inne).
-Z opisu planowanej inwestycji wyciągasz parametry do wyszukania podobnych, zrealizowanych inwestycji.
-Zwracasz WYŁĄCZNIE JSON zgodny ze schematem. Nie zmyślaj – brak informacji = pomiń pole lub 0.
-podsektor: siec_wod (sieć wodociągowa), kan_san (kanalizacja sanitarna), oczyszczalnia (oczyszczalnia ścieków),
-suw (stacja uzdatniania, ujęcia, zbiorniki wody), deszcz (kanalizacja deszczowa i retencja), inne_wk, inny_sektor.
-kwota_pln: liczba w złotych (np. 4,2 mln -> 4200000). czas_miesiace: planowany czas realizacji.
-elementy: krótkie frazy techniczne (np. "przepompownia", "przewiert pod drogą wojewódzką").
-streszczenie: 1–2 zdania prostym językiem."""
+WORKS_LABELS = ["budowa", "rozbudowa", "przebudowa", "modernizacja", "remont/renowacja", ""]
+PROVINCE_LABELS = ["dolnośląskie", "kujawsko-pomorskie", "lubelskie", "lubuskie", "łódzkie", "małopolskie", "mazowieckie", "opolskie",
+                   "podkarpackie", "podlaskie", "pomorskie", "śląskie", "świętokrzyskie", "warmińsko-mazurskie", "wielkopolskie",
+                   "zachodniopomorskie", ""]
 
 
-def understand_query(text: str) -> dict:
-    return chat_json(QUERY_SYSTEM, "Opis inwestycji:\n\"\"\"\n" + text[:12000] + "\n\"\"\"", QUERY_SCHEMA)
+def _f(value_schema: dict | None = None) -> dict:
+    """Pole = wartość + dosłowny cytat (serwer sprawdza, czy cytat jest w tekście)."""
+    return {"type": "object", "properties": {"wartosc": value_schema or {"type": "string"}, "cytat": {"type": "string"}},
+            "required": ["wartosc", "cytat"]}
+
+
+def query_schema(feature_labels: list[str]) -> dict:
+    # wszystkie wartości tekstowe – mały model niezawodnie zwraca tekst; liczby parsuje serwer
+    return {
+        "type": "object",
+        "properties": {
+            "czy_konkretna_inwestycja": {"type": "boolean"},
+            "rodzaj_inwestycji": _f({"type": "string", "enum": list(SUBSECTOR_LABELS)}),
+            "rodzaj_robot": _f({"type": "string", "enum": WORKS_LABELS}),
+            "zaprojektuj_i_wybuduj": _f({"type": "string", "enum": ["tak", "nie"]}),
+            "zamawiajacy": _f(),
+            "miejscowosc": _f(),
+            "wojewodztwo": _f({"type": "string", "enum": PROVINCE_LABELS}),
+            "kwota": {"type": "object", "properties": {"tekst": {"type": "string"}, "vat": {"type": "string", "enum": ["netto", "brutto", "nieokreślone"]},
+                                                     "cytat": {"type": "string"}}, "required": ["tekst", "vat", "cytat"]},
+            "czas_realizacji": {"type": "object", "properties": {"liczba": {"type": "string"},
+                                                               "jednostka": {"type": "string", "enum": ["dni", "tygodnie", "miesiące", "lata", ""]},
+                                                               "cytat": {"type": "string"}}, "required": ["liczba", "jednostka", "cytat"]},
+            "dlugosc_sieci_km": _f(),
+            "liczba_przylaczy": _f(),
+            "elementy": {"type": "array", "maxItems": 10, "items": {"type": "string", "enum": feature_labels}},
+            "slowa_kluczowe": {"type": "array", "maxItems": 8, "items": {"type": "string"}},
+            "streszczenie": {"type": "string"},
+        },
+        "required": ["czy_konkretna_inwestycja", "rodzaj_inwestycji", "rodzaj_robot", "zaprojektuj_i_wybuduj", "zamawiajacy", "miejscowosc",
+                     "wojewodztwo", "kwota", "czas_realizacji", "dlugosc_sieci_km", "liczba_przylaczy", "elementy", "slowa_kluczowe", "streszczenie"],
+    }
+
+
+QUERY_SYSTEM = """Jesteś asystentem urzędnika, który przygotowuje inwestycję publiczną w Polsce.
+Z opisu planowanej inwestycji wyciągasz parametry potrzebne do wyszukania podobnych, zrealizowanych inwestycji.
+Zwracasz WYŁĄCZNIE obiekt JSON zgodny ze schematem.
+
+Zasady:
+- Wartości bierz WYŁĄCZNIE z opisu użytkownika. Nie zgaduj. Gdy czegoś nie ma – "" (pusty tekst) i pusty cytat.
+- "cytat" to DOSŁOWNY, krótki fragment opisu (najwyżej 10 słów), z którego pochodzi wartość.
+- czy_konkretna_inwestycja: true, gdy opis mówi, CO ma zostać zbudowane lub przebudowane; false, gdy jest zbyt ogólny.
+- rodzaj_inwestycji: główny obiekt robót. Drogi, budynki, szkoły itp. = "inny sektor (drogi, budynki, energetyka…)".
+- rodzaj_robot: budowa (nowy obiekt), rozbudowa (powiększenie istniejącego), przebudowa, modernizacja, remont/renowacja.
+- zaprojektuj_i_wybuduj: "tak" tylko, gdy wykonawca ma też zaprojektować obiekt (formuła „zaprojektuj i wybuduj”, PFU).
+- zamawiajacy: nazwa instytucji (np. „Gmina Lipowo”). miejscowosc: w mianowniku. Bez adresów.
+- wojewodztwo: z listy; podaj także, gdy jednoznacznie wynika z nazwy powiatu lub znanego miasta.
+- kwota.tekst: PRZEPISZ kwotę tak jak w opisie, z „mln” lub „tys.” (np. "6 mln zł"); vat: netto / brutto / nieokreślone.
+- czas_realizacji: liczba (np. "18", "1", "półtora") i jednostka; „rok na realizację” = liczba "1", jednostka "lata".
+- dlugosc_sieci_km: łączna długość sieci lub rurociągów w km (np. "10,7"); gdy podano w metrach – przelicz na km.
+- liczba_przylaczy: liczba przyłączy, jeśli podana.
+- elementy: tylko elementy z listy, które naprawdę występują w opisie.
+- slowa_kluczowe: 3–8 krótkich fraz technicznych do wyszukiwania (np. "kanalizacja grawitacyjna", "przepompownia ścieków",
+  "przewiert pod drogą"); bez nazw miejscowości, bez kwot i bez słów ogólnych („inwestycja”, „gmina”).
+- streszczenie: jedno zdanie prostym językiem: co, gdzie, jaka skala."""
+
+
+def understand_query(text: str, feature_labels: list[str]) -> dict:
+    return chat_json(QUERY_SYSTEM, "Opis inwestycji:\n\"\"\"\n" + text[:6000] + "\n\"\"\"", query_schema(feature_labels))
 
 
 SUMMARY_SYSTEM = """Jesteś doradcą urzędnika przygotowującego inwestycję publiczną. Na podstawie danych z raportu

@@ -5,6 +5,7 @@ Uruchomienie:  python -m riskminer serve      (domyślnie http://127.0.0.1:8000)
 
 from __future__ import annotations
 
+import base64
 import datetime as dt
 import http.server
 import json
@@ -31,6 +32,7 @@ from .textutil import now_iso, zunpack
 WEB = Path(__file__).resolve().parent.parent / "web"
 JOBS: dict[str, dict[str, Any]] = {}
 MAX_UPLOAD = 60 * 1024 * 1024
+BASE_URL = "http://127.0.0.1:8000"
 
 
 def start_job(title: str, fn: Callable[[Callable[[str], None]], Any]) -> str:
@@ -462,7 +464,52 @@ def handle_upload(conn, q, data: bytes, filename: str):
     return res
 
 
+def _b64file(x: Any) -> tuple[str, bytes] | None:
+    if not x or not x.get("b64"):
+        return None
+    return (x.get("name") or "plik.bin", base64.b64decode(x["b64"]))
+
+
+def api_process(conn, q, body):
+    """Pakiet plików jednym kliknięciem: rekord projektu + opis inwestycji -> pliki wyników (test jury)."""
+    from .pipeline import process
+    project, investment = _b64file(body.get("project")), _b64file(body.get("investment"))
+    text = body.get("text") or ""
+    if not project and not investment and len(text.strip()) < 15:
+        raise ValueError("Dodaj rekord projektu i/lub opis nowej inwestycji.")
+    names = " + ".join(x[0] for x in (project, investment) if x) or "wklejony opis"
+
+    def run(say):
+        return process(db.connect(), project, investment, investment_text=text, external=body.get("external", True), base_url=BASE_URL, say=say)
+    return {"job": start_job(f"Przetwarzanie: {names}", run)}
+
+
+def api_results(conn, q, body):
+    from .pipeline import results_root
+    root = results_root()
+    out = []
+    for d in sorted(root.glob("*/"), reverse=True)[:20] if root.exists() else []:
+        out.append({"run": d.name, "files": [{"name": f.name, "size": f.stat().st_size} for f in sorted(d.iterdir()) if f.is_file()]})
+    return out
+
+
+def api_bip(conn, q, body):
+    from .bip_import import import_bip
+    urls = [u for u in re.split(r"[\s,;]+", body.get("urls") or "") if u]
+    text = body.get("text") or ""
+    if not urls and len(text.strip()) < 40:
+        raise ValueError("Wklej adres strony BIP albo treść skopiowaną ze strony.")
+
+    def run(say):
+        return import_bip(db.connect(), urls, text=text, title=body.get("title") or "", project_id=body.get("project_id") or None,
+                          attachments=body.get("attachments", True), say=say)
+    return {"job": start_job(f"Dane z BIP ({len(urls)} adresów)", run)}
+
+
 ROUTES: list[tuple[str, str, Callable]] = [
+    ("POST", r"/api/process", api_process),
+    ("GET", r"/api/results", api_results),
+    ("POST", r"/api/bip", api_bip),
     ("GET", r"/api/status", api_status),
     ("POST", r"/api/understand", api_understand),
     ("POST", r"/api/analyze", api_analyze),
@@ -551,6 +598,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._json(200, handle_upload(conn, q, raw, name))
         if path == "/api/notice":
             return self._json(200, api_notice_text(conn, q, {}, q.get("n", "")))
+        m = re.fullmatch(r"/api/results/([\w-]+)/([\w.-]+)", path)
+        if m:
+            from .pipeline import results_root
+            f = (results_root() / m.group(1) / m.group(2)).resolve()
+            if not str(f).startswith(str(results_root().resolve())) or not f.is_file():
+                raise KeyError("Nie ma takiego pliku wyników")
+            ctype = {".md": "text/markdown; charset=utf-8", ".json": "application/json; charset=utf-8", ".csv": "text/csv; charset=utf-8",
+                     ".pdf": "application/pdf", ".zip": "application/zip"}.get(f.suffix, "application/octet-stream")
+            if q.get("inline") and f.suffix in (".md", ".pdf"):
+                return self._send(200, f.read_bytes(), "text/plain; charset=utf-8" if f.suffix == ".md" else ctype)
+            return self._file(f.name, f.read_bytes(), ctype)
         # eksporty plików
         m = re.fullmatch(r"/api/analyses/([\w-]+)/export", path)
         if m:
@@ -624,6 +682,8 @@ def serve(host: str | None = None, port: int | None = None, open_browser: bool |
     db.seed_knowledge(conn)
     srv = Server((host, port), Handler)
     url = f"http://{'127.0.0.1' if host in ('0.0.0.0', '') else host}:{port}/"
+    global BASE_URL
+    BASE_URL = url.rstrip("/")
     n = conn.execute("SELECT COUNT(*) FROM procedures").fetchone()[0]
     print(f"Risk Miner {__version__} działa: {url}")
     print(f"Baza: {db.DB_PATH} ({n:,} postępowań)".replace(",", " "))

@@ -25,6 +25,10 @@ bip_max_pages = 40                             # limit stron przeszukiwanych w B
 [llm]
 # Model językowy jest OPCJONALNY. provider = "none" -> reguły eksperckie + statystyka (działa offline, dane nie opuszczają komputera).
 #
+# 0) Lokalnie, mały model na CPU (zalecane na laptopie, bez karty graficznej) – llama.cpp + Qwen2.5-3B lub Bielik-1.5B:
+#      scripts/start_llm.sh                      # serwer zgodny z OpenAI na http://127.0.0.1:8080
+#    provider = "openai", base_url = "http://127.0.0.1:8080", model = "qwen2.5-3b-q4km"
+#
 # 1) Lokalnie (dane zostają na komputerze) – Ollama + polski model Bielik:
 #      ollama pull SpeakLeash/bielik-11b-v3.0-instruct:Q4_K_M
 #    provider = "ollama", base_url = "http://127.0.0.1:11434"
