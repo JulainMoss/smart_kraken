@@ -515,6 +515,12 @@ def import_document(conn: sqlite3.Connection, filename: str, data: bytes, projec
     return {"doc_id": doc_id, "pages": len(parsed["pages"]), "chars": len(full_text(parsed["pages"])), "events": n_ev, "kind": parsed["kind"]}
 
 
+# zdanie z rekordu jest zdarzeniem tylko, gdy opisuje, że coś SIĘ STAŁO (nie: sama kwota dofinansowania czy cel projektu)
+EVENT_SIGNAL = (r"aneks|przedluz|wydluz|opozni|zmian\w* (umowy|terminu|zakresu|wynagrodz)|kolizj|robot\w* (dodatkow|zamienn|nieprzewidz)|"
+                r"uniewazni|odstapi|rozwiaz\w* umow|kar\w* umown|spor|sad|kio|odwola|niewykona|nienalezyt|wzrost\w* (koszt|cen|wartosc)|"
+                r"zwieksz\w* (wynagrodz|wartosc|koszt)|przekrocz|wstrzyma|problem|trudnos|awari|upadlos|zejscie wykonawcy|nie (uzyskano|zawarto)|brak\w* (zgod|decyzj|pozwol)")
+
+
 def record_events(conn: sqlite3.Connection, project_id: str) -> int:
     """Wiedza wpisana w rekord projektu (adnotacja instytucji, zakres, opis) -> dokument „rekord projektu” + zdarzenia ryzyka
     (z cytatem i wskazaniem kolumny). Wpisy instytucji traktujemy jako wiarygodne: niższy próg rozpoznania, bez obniżania pewności."""
@@ -531,7 +537,7 @@ def record_events(conn: sqlite3.Connection, project_id: str) -> int:
               "treść rekordu projektu", 1.0, [f"plik: {p.get('source_file') or ''}"], "approved")
     # wpis instytucji jest źródłem wiarygodniejszym niż strona WWW: niższy próg rozpoznania, premia za źródło (maks. 0,95)
     return analyze_document(conn, doc_id, min_conf=0.5, factor=1.1, event_type="zdarzenie wskazane w rekordzie projektu",
-                            method="reguła (katalog ekspercki) – treść rekordu projektu")
+                            method="reguła (katalog ekspercki) – treść rekordu projektu", require=EVENT_SIGNAL)
 
 
 def _doc_type(filename: str, text: str) -> str:
@@ -545,7 +551,8 @@ def _doc_type(filename: str, text: str) -> str:
 
 
 def analyze_document(conn: sqlite3.Connection, doc_id: str, min_conf: float = 0.75, factor: float = 0.9,
-                     event_type: str = "fragment dokumentu wskazujący na ryzyko", method: str = "reguła (katalog ekspercki) – dokument") -> int:
+                     event_type: str = "fragment dokumentu wskazujący na ryzyko", method: str = "reguła (katalog ekspercki) – dokument",
+                     require: str | None = None) -> int:
     """Znajduje w dokumencie fragmenty świadczące o ryzyku (zdania dopasowane do katalogu) – z numerem strony."""
     from .textutil import zunpack
     d = one(conn, "SELECT * FROM documents WHERE doc_id=?", (doc_id,))
@@ -562,7 +569,7 @@ def analyze_document(conn: sqlite3.Connection, doc_id: str, min_conf: float = 0.
         for sent in split_sentences(text):
             if len(sent) > 700:
                 sent = sent[:700]
-            if _boilerplate(sent):
+            if _boilerplate(sent) or (require and not re.search(require, fold(sent))):
                 continue
             # w dokumentach wymagamy co najmniej dwóch niezależnych sygnałów (mniej fałszywych trafień)
             codes = [c for c in clf.classify_risk(sent, max_codes=1) if c["confidence"] >= min_conf and c["status"] == "active"]
