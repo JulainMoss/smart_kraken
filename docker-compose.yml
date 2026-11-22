@@ -1,0 +1,101 @@
+# Cały projekt w kontenerach:  docker compose up -d --build
+#   Risk Miner         http://127.0.0.1:8000
+#   Ekstraktor LLM     http://127.0.0.1:8001
+#   Ollama (model)     wewnątrz sieci Dockera (http://ollama:11434); model pobierany przy pierwszym starcie
+# Ustawienia: plik .env (kopia .env.example). Karta NVIDIA: dodaj -f docker-compose.gpu.yml
+# Budowa bazy Risk Miner (jednorazowo): docker compose --profile setup run --rm baza
+
+name: smart-kraken
+
+x-llm: &llm
+  LLM_URL: ${LLM_URL:-http://ollama:11434}
+  LLM_MODEL: ${LLM_MODEL:-SpeakLeash/bielik-1.5b-v3.0-instruct:Q8_0}
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: 30m
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # jednorazowe pobranie modelu do wolumenu (kolejne starty: kilka sekund, model już jest)
+  ollama-pull:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["ollama", "pull", "${LLM_MODEL:-SpeakLeash/bielik-1.5b-v3.0-instruct:Q8_0}"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+  riskminer:
+    build: .
+    image: smart-kraken/riskminer
+    restart: unless-stopped
+    ports:
+      - "${RISKMINER_PORT:-8000}:8000"
+    environment:
+      RISKMINER_LLM_PROVIDER: ${RISKMINER_LLM_PROVIDER:-ollama}
+      RISKMINER_LLM_BASE_URL: ${LLM_URL:-http://ollama:11434}
+      RISKMINER_LLM_MODEL: ${LLM_MODEL:-SpeakLeash/bielik-1.5b-v3.0-instruct:Q8_0}
+      RISKMINER_LLM_API_KEY: ${RISKMINER_LLM_API_KEY:-}
+      RISKMINER_LLM_DATA_LOCATION: "lokalnie (kontener Docker, model Ollama)"
+      RISKMINER_DATA_BZP_MIRROR_JSONL: /bzp/bzp_kopia/notices.jsonl
+      RISKMINER_DATA_DATA_LAKE: /bzp/data_lake
+    volumes:
+      - riskminer-data:/app/data
+      - ${BZP_KOPIA_DIR:-../risk_miner_bzp_kopia}:/bzp:ro
+      - ${MATERIALY_DIR:-../Risk_Miner_materialy_dla_uczestnikow_na_start}:/materialy:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      ollama:
+        condition: service_healthy
+        required: false
+
+  ekstraktor:
+    build: ./tools/ekstraktor_llm
+    image: smart-kraken/ekstraktor
+    restart: unless-stopped
+    ports:
+      - "${EKSTRAKTOR_PORT:-8001}:8001"
+    command: ["--llm-url", "${LLM_URL:-http://ollama:11434}", "--model", "${LLM_MODEL:-SpeakLeash/bielik-1.5b-v3.0-instruct:Q8_0}"]
+    volumes:
+      - ./tools/ekstraktor_llm/wyniki:/app/wyniki
+      - ./tools/ekstraktor_llm/debug:/app/debug
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      ollama:
+        condition: service_healthy
+        required: false
+
+  # budowa bazy z kopii BZP + import 22 projektów MFiPR (uruchamiane ręcznie, profil "setup")
+  baza:
+    image: smart-kraken/riskminer
+    profiles: ["setup"]
+    environment:
+      RISKMINER_DATA_BZP_MIRROR_JSONL: /bzp/bzp_kopia/notices.jsonl
+      RISKMINER_DATA_DATA_LAKE: /bzp/data_lake
+    volumes:
+      - riskminer-data:/app/data
+      - ${BZP_KOPIA_DIR:-../risk_miner_bzp_kopia}:/bzp:ro
+      - ${MATERIALY_DIR:-../Risk_Miner_materialy_dla_uczestnikow_na_start}:/materialy:ro
+    entrypoint: ["sh", "-c"]
+    command:
+      - >
+        python -m riskminer build &&
+        (python -m riskminer extras || echo "extras: brak data_lake – pomijam") &&
+        (if [ -f /materialy/Risk_Miner_dane_projekty.xlsx ]; then python -m riskminer import /materialy/Risk_Miner_dane_projekty.xlsx; fi)
+
+volumes:
+  ollama-models:
+  riskminer-data:
