@@ -166,7 +166,7 @@ function viewParams(q){
     <div class="form-grid">
       <div><label class="field">Rodzaj inwestycji (podsektor)</label><select id="p_sub">${Object.entries(SUB).map(([k,n])=>`<option value="${k}" ${v("subsector")===k?"selected":""}>${n}</option>`).join("")}<option value="" ${!v("subsector")?"selected":""}>— inny / nie wiem —</option></select>${src("subsector")}</div>
       <div><label class="field">Rodzaj robót</label><select id="p_wt"><option value="">— nie określono —</option>${WORKS.map(w=>`<option ${v("works_type")===w?"selected":""}>${w}</option>`).join("")}</select>${src("works_type")}</div>
-      <div><label class="field">Budżet (zł)</label><div class="row" style="flex-wrap:nowrap"><input id="p_budget" type="number" min="0" step="1000" value="${v("budget") ?? ""}" placeholder="np. 4200000"><select id="p_vat" style="width:120px">${["netto","brutto","nieokreślone"].map(x=>`<option ${v("budget_vat")===x?"selected":""}>${x}</option>`).join("")}</select></div>${src("budget")}</div>
+      <div style="grid-column:span 2"><label class="field">Budżet (zł) <span id="p_budget_fmt" class="muted" style="font-weight:400">${v("budget") ? "= " + pln(v("budget")) : ""}</span></label><div class="row" style="flex-wrap:nowrap"><input id="p_budget" type="number" min="0" step="1000" value="${v("budget") ?? ""}" placeholder="np. 4200000" style="flex:1"><select id="p_vat" style="width:140px">${["netto","brutto","nieokreślone"].map(x=>`<option ${v("budget_vat")===x?"selected":""}>${x}</option>`).join("")}</select></div>${src("budget")}</div>
       <div><label class="field">Planowany czas realizacji (miesiące)</label><input id="p_dur" type="number" min="0" step="0.5" value="${months}">${src("duration_days")}</div>
       <div><label class="field">Długość sieci (km)</label><input id="p_len" type="number" min="0" step="0.1" value="${v("length_km") ?? ""}">${src("length_km")}</div>
       <div><label class="field">Liczba przyłączy</label><input id="p_con" type="number" min="0" step="1" value="${v("connections") ?? ""}">${src("connections")}</div>
@@ -180,6 +180,7 @@ function viewParams(q){
   </div>`;
   $$("[data-feat]").forEach(c => c.onchange = () => c.parentElement.classList.toggle("sel", c.checked));
   $("#back").onclick = () => viewAnalysis();
+  $("#p_budget").oninput = () => { const x = Number($("#p_budget").value); $("#p_budget_fmt").textContent = x ? "= " + pln(x) : ""; };
   $("#run").onclick = async () => {
     const num = id => { const x = $(id).value; return x === "" ? null : Number(x); };
     const overrides = { subsector: $("#p_sub").value, works_type: $("#p_wt").value, budget: num("#p_budget"), budget_vat: $("#p_vat").value,
