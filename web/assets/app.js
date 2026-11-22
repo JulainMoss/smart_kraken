@@ -178,6 +178,31 @@ async function runUnderstand(text){
   finally{ clearInterval(timer); }
 }
 
+// szczegóły ekstrakcji modelem (riskminer/ekstrakcja.py): zakres rzeczowy w liczbach i wyliczenie czasu realizacji
+function extractionHtml(e){
+  if(!e) return "";
+  const num = x => Number(x).toLocaleString("pl-PL", {maximumFractionDigits: 3});
+  const rows = (e.zakres_rzeczowy || []).map(x => {
+    const flag = x.z_reguly ? tag("z tekstu (reguła)", "grey") : (x.zrodlo === "brak" || x.liczba_w_cytacie === false) ? tag("sprawdź", "warn") : tag("model", "model");
+    const fix = x.poprawka ? ` ${tag("jedn. poprawiona", "warn")}` : "";
+    const base = x.jednostka !== x.jednostka_bazowa ? ` <span class="muted">(${num(x.ilosc_bazowa)} ${esc(x.jednostka_bazowa)})</span>` : "";
+    return `<tr><td>${esc(x.element)}${x.opis && x.opis !== x.element ? `<div class="muted">${esc(x.opis)}</div>` : ""}</td>
+      <td style="text-align:right;white-space:nowrap">${num(x.ilosc)} ${esc(x.jednostka)}${base}</td><td>${esc(x.parametry || "")}</td>
+      <td>${flag}${fix}${x.cytat ? ` <span class="q">„${esc(x.cytat.slice(0, 110))}”</span>` : ""}</td></tr>`;
+  }).join("");
+  const sums = Object.entries(e.zakres_suma || {}).flatMap(([el, u]) => Object.entries(u).map(([j, v]) => `${esc(el)}: <b>${num(v)} ${esc(j)}</b>`));
+  const t = e.planowany_czas || {};
+  const time = [t.data_podpisania && `podpisanie umowy ${esc(t.data_podpisania)}`, t.liczba != null && t.jednostka && `czas trwania ${num(t.liczba)} ${esc(t.jednostka)}`,
+    (t.termin_do || t.termin_wyliczony) && `koniec ${esc(t.termin_do || t.termin_wyliczony)}${t.termin_do ? "" : " (wyliczony)"}`,
+    t.termin_pierwotny && `termin pierwotny ${esc(t.termin_pierwotny)}`, t.przedluzenie_dni && `przedłużenie o ${t.przedluzenie_dni} dni`].filter(Boolean);
+  return `<div style="margin-top:16px"><label class="field">Zakres rzeczowy w liczbach</label>
+    ${rows ? `<div class="table-wrap"><table><thead><tr><th>Element</th><th style="text-align:right">Ilość</th><th>Parametry</th><th>Źródło</th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${sums.length ? `<p class="muted" style="margin:6px 0 0">Razem (km → m): ${sums.join(" · ")}</p>` : ""}`
+      : `<p class="muted" style="margin:0">Model nie znalazł w opisie ilości (długości, sztuk, powierzchni).</p>`}</div>
+    ${t.dni != null ? `<div style="margin-top:12px"><label class="field">Czas realizacji – wyliczenie</label><div><b>${t.dni} dni</b> ${time.length ? "· " + time.join(" · ") : ""}
+      <div class="muted">${esc(t.podstawa || "")}</div></div></div>` : ""}`;
+}
+
 const SRC_TAG = {"model": ["model", "model"], "model i reguły": ["model i reguły – zgodne", "ok"], "reguła": ["reguły", "grey"], "użytkownik": ["poprawione", "src"]};
 function viewParams(q){
   const P = q.params, v = k => P[k]?.value, C = q.conflicts || {};
@@ -216,6 +241,7 @@ function viewParams(q){
     <div style="margin-top:16px"><label class="field">Elementy techniczne i warunki</label><p class="muted" style="margin:0 0 8px">Zaznaczone zostały odczytane z opisu. Popraw, jeśli trzeba.</p>
       <div>${Object.entries(FEATS).map(([k,n])=>`<label class="chip ${feats.has(k)?"sel":""}"><input type="checkbox" data-feat="${k}" ${feats.has(k)?"checked":""}> ${n}</label>`).join("")}</div></div>
     ${q.search_terms?.length ? `<div style="margin-top:16px"><label class="field">Frazy do wyszukiwania</label><div>${q.search_terms.map(t=>`<span class="chip">${esc(t)}</span>`).join("")}</div></div>` : ""}
+    ${extractionHtml(q.ekstrakcja)}
   </div>
   <div class="row"><button id="back">${ic("arrow-left")}Wróć do opisu</button><div class="spacer"></div>
     <span class="muted">Metoda: ${esc(q.method)}</span><button class="primary btn-lg" id="run">Wygeneruj raport</button></div>`;

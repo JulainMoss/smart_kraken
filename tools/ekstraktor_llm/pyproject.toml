@@ -1,9 +1,0 @@
-[project]
-name = "smart-kraken"
-version = "0.1.0"
-description = "Analiza opisu inwestycji lokalnym LLM – streszczenie, zamawiający, kwota, termin i słowa kluczowe z tekstu, PDF lub DOCX"
-readme = "README.md"
-requires-python = ">=3.14"
-dependencies = [
-    "pypdf[image]>=4.0",   # odczyt PDF; [image] = Pillow – lepsze OCR skanów (reszta: biblioteka standardowa)
-]

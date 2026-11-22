@@ -13,12 +13,12 @@ data/uploads/
 config.toml
 wyniki_testu/
 
-# zapis zapytań i odpowiedzi modelu (debug – narzędzie ekstraktora)
+# zapis zapytań i odpowiedzi modelu (debug)
 debug/
 pliki/
 data/*.log
 
-# wyniki analiz zapisywane przez serwer ekstraktora
+# wyniki analiz (stare pliki ekstraktora)
 wyniki/
 
 # Docker – lokalne ustawienia

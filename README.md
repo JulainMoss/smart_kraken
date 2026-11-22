@@ -344,8 +344,8 @@ objaśnienia liczb („jak czytać medianę i przedział”), etykiety dla danyc
 ## 6. Instalacja, konfiguracja, hosting
 
 * **Lokalnie:** `python -m riskminer serve` (opcje `--host 0.0.0.0 --port 8000 --no-browser`).
-* **Docker (cały projekt):** `docker compose up -d --build` – Risk Miner (http://127.0.0.1:8000), ekstraktor LLM
-  (http://127.0.0.1:8001) i Ollama z modelem Bielik (pobierany przy pierwszym starcie). Szczegóły w sekcji 6a.
+* **Docker (cały projekt):** `docker compose up -d --build` – Risk Miner (http://127.0.0.1:8000) i Ollama z modelem
+  Bielik (pobierany przy pierwszym starcie). Szczegóły w sekcji 6a.
 * **Serwer:** dowolny VPS z Pythonem 3.10+; aplikacja to jeden proces i jeden plik bazy (SQLite). Za odwrotnym proxy (nginx) z TLS.
 * **Konfiguracja:** `config.toml` (kopia `config.example.toml`) lub zmienne `RISKMINER_<SEKCJA>_<KLUCZ>`.
 
@@ -370,12 +370,11 @@ Polecenia CLI:
 ## 6a. Docker – cały projekt
 
 Wymagany Docker Desktop (Windows: backend WSL 2). Pliki: `docker-compose.yml`, `docker-compose.gpu.yml`,
-`Dockerfile` (Risk Miner), `tools/ekstraktor_llm/Dockerfile`, `.env.example`.
+`Dockerfile` (Risk Miner), `.env.example`.
 
 | Usługa | Adres | Dane |
 |---|---|---|
 | `riskminer` | http://127.0.0.1:8000 | baza w wolumenie `riskminer-data` |
-| `ekstraktor` | http://127.0.0.1:8001 | `tools/ekstraktor_llm/wyniki`, `debug` |
 | `ollama` (+ `ollama-pull`) | tylko w sieci Dockera | modele w wolumenie `ollama-models` |
 
 ```
@@ -390,8 +389,8 @@ docker compose down                                      # stop (dane i modele z
 * Kopia BZP (`risk_miner_bzp_kopia.zip`) rozpakowana obok repozytorium: `../risk_miner_bzp_kopia/bzp_kopia/notices.jsonl`
   (inna ścieżka: `BZP_KOPIA_DIR` w `.env`). Materiały konkursowe: `MATERIALY_DIR`.
 * Ollama zainstalowana w Windows (model już pobrany): w `.env` ustaw `LLM_URL=http://host.docker.internal:11434`
-  i uruchamiaj `docker compose up -d --build --no-deps riskminer ekstraktor`.
-* Bez modelu: `RISKMINER_LLM_PROVIDER=none` (Risk Miner działa na regułach; ekstraktor wymaga modelu).
+  i uruchamiaj `docker compose up -d --build --no-deps riskminer`.
+* Bez modelu: `RISKMINER_LLM_PROVIDER=none` (Risk Miner działa na regułach).
 * Polecenia CLI w kontenerze: `docker compose exec riskminer python -m riskminer link-report`.
 * Kopia bazy na dysk: `docker compose cp riskminer:/app/data/riskminer.sqlite .`
 * LibreOffice (.doc/.odt/.rtf) nie jest w obrazie domyślnie: `docker compose build --build-arg LIBREOFFICE=1 riskminer`.
@@ -413,8 +412,8 @@ riskminer/              pakiet (wyłącznie biblioteka standardowa Pythona)
   export.py             JSON / CSV / Markdown
   server.py             API + serwer strony
   llm.py, config.py     wymienny model językowy, konfiguracja
+  ekstrakcja.py         instrukcja i schemat dla modelu + weryfikacja odpowiedzi z tekstem (cytaty, kwoty, daty, zakres rzeczowy)
 web/                    interfejs (HTML + CSS + JS, bez frameworków)
-tools/ekstraktor_llm/   samodzielne narzędzie: ekstrakcja parametrów z opisu lokalnym LLM (Bielik) z weryfikacją cytatów
 tools/harvesters/       skrypty, które zasiliły data_lake (KIO, KPOŚK, NIK, RIO, TED, BK2021, BZP wielosektorowe)
 docs/                   architektura, raport z testu łączenia, przykładowe eksporty
 ```
@@ -462,5 +461,5 @@ zdarzenia z określoną pewnością – dlatego **każde zdarzenie czeka na wery
 
 ---
 
-*Narzędzie `tools/ekstraktor_llm` (ekstrakcja parametrów z opisu lokalnym modelem Bielik z weryfikacją cytatów) – pierwotna
-aplikacja zespołu, zachowana jako samodzielny moduł.*
+*Ekstrakcja parametrów z opisu modelem (dawniej osobne narzędzie `tools/ekstraktor_llm`, port 8001) jest częścią Risk Miner:
+`riskminer/ekstrakcja.py` – ta sama instrukcja, schemat i weryfikacja odpowiedzi.*

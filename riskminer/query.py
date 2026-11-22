@@ -212,81 +212,72 @@ def sector_from_text(text: str, sub: str = "") -> tuple[str, str]:
     return best[0], text[max(0, best[1] - 30):best[2] + 40].replace("\n", " ").strip()
 
 
+# elementy zakresu rzeczowego (ekstrakcja) liczone do długości sieci i do liczby przyłączy
+_NETWORK = {"kanalizacja sanitarna grawitacyjna", "kanalizacja sanitarna tłoczna", "kanalizacja sanitarna (inna/nieokreślona)",
+            "kanalizacja deszczowa", "sieć wodociągowa"}
+_CONNECTIONS = {"przyłącza kanalizacyjne", "przyłącza wodociągowe"}
+
+
 def _merge_llm(clf: Classifier, q: dict, text: str, put) -> None:
-    """Model językowy wypełnia formularz parametrów. Każda wartość ma cytat sprawdzany w tekście.
-    Kategorie (rodzaj inwestycji, robót, formuła, miejsce) – pierwszeństwo ma model, bo lepiej rozumie język;
-    liczby – pierwszeństwo mają reguły (dokładne wyrażenia), model uzupełnia braki. Rozbieżności są pokazywane użytkownikowi."""
+    """Model językowy wypełnia formularz parametrów – ta sama instrukcja, schemat i weryfikacja co w ekstraktorze
+    (riskminer.ekstrakcja): cytaty sprawdzane w tekście, kwota nie może być zamawiającym, daty spoza tekstu odrzucane,
+    czas od daty podpisania umowy, zakres rzeczowy w liczbach. Kategorie (zamawiający, miejsce) – pierwszeństwo ma model;
+    liczby – pierwszeństwo mają reguły, model uzupełnia braki. Rozbieżności są pokazywane użytkownikowi."""
+    import datetime as dt
     import time
+    from . import ekstrakcja as ek
     P = q["params"]
-    feat_names = clf.feature_names()
-    label_to_feat = {v: k for k, v in feat_names.items()}
     t0 = time.time()
     try:
         llm.reset_last()
-        r = llm.understand_query(text, list(label_to_feat))
+        raw = llm.extract_params(text)
     except Exception as e:  # model niedostępny – zostają reguły
         q["warnings"].append(f"Model językowy niedostępny ({type(e).__name__}) – parametry odczytano regułami.")
         return
-    q["llm"] = r
+    r = ek.postprocess(raw if isinstance(raw, dict) else {}, text, dt.date.today())
+    q["llm"] = raw
+    q["ekstrakcja"] = r
     used = llm.last_used()
     q["llm_info"] = {"model": used.get("model"), "seconds": round(time.time() - t0, 1), "where": used.get("where"), "fallback": used.get("fallback")}
     if used.get("fallback"):
         q["warnings"].append(f"Główny model był niedostępny – parametry odczytał model zapasowy {used.get('model')} ({used.get('where')}).")
     q["method"] = "model językowy + reguły"
     conflicts = q.setdefault("conflicts", {})
-    sub_names = {s["code"]: s["name"] for s in clf.subsectors}
+    for key, label in (("zamawiajacy", "zamawiający"), ("miejscowosc", "miejscowość"), ("wojewodztwo", "województwo"),
+                       ("planowana_kwota", "kwota"), ("planowany_czas", "czas realizacji")):
+        rej = (r.get(key) or {}).get("odrzucone")
+        if rej:
+            q["warnings"].append(f"Odrzucono odpowiedź modelu ({label}): „{rej.get('wartosc')}” – {rej.get('powod')}.")
+    if r["planowany_czas"].get("uwaga"):
+        q["warnings"].append("Czas realizacji: " + r["planowany_czas"]["uwaga"])
 
-    def field(name):
-        f = r.get(name) or {}
-        return (f.get("wartosc") or "").strip() if isinstance(f, dict) else "", (f.get("cytat") or "").strip() if isinstance(f, dict) else ""
-
-    def category(key, value, quote, show=lambda x: x):
-        """Wartość kategorii od modelu: przyjęta, gdy cytat jest w tekście (lub brak wartości z reguł)."""
+    def category(key, f, value=None):
+        """Wartość od modelu (po weryfikacji): przyjęta, gdy cytat jest w tekście albo reguły nic nie znalazły."""
+        value = f.get("wartosc") if value is None else value
+        quote = f.get("cytat") or ""
+        ok = f.get("zrodlo") not in (None, "", "brak") and verify_quote(quote, text)
         rule = P[key]["value"]
-        ok = verify_quote(quote, text) if quote else False
         if value in (None, "") or (not ok and rule not in (None, "", False)):
             return
         if rule not in (None, "", False) and rule != value:
-            conflicts[key] = f"reguły: {show(rule)}"
-        put(key, value, quote if ok else "", "model i reguły" if rule == value else "model")
+            conflicts[key] = f"reguły: {rule}"
+        put(key, value, quote if ok else "", "reguła" if f.get("z_reguly") else ("model i reguły" if rule == value else "model"))
 
-    # rodzaj inwestycji
-    v, c = field("rodzaj_inwestycji")
-    if v in llm.SUBSECTOR_LABELS:
-        msec, msub = llm.SUBSECTOR_LABELS[v]
-        rsec = P["sector"]["value"]
-        ok = verify_quote(c, text)
-        if msub:
-            category("subsector", msub, c, lambda x: sub_names.get(x, x))
-        if msec != rsec and (ok or rsec == "inne"):
-            if rsec != "inne":
-                conflicts["sector"] = f"reguły: {SECTOR_NAMES.get(rsec, rsec)}"
-            put("sector", msec, c if ok else "", "model")
-            if msec != "wod-kan" and P["subsector"]["value"]:   # obiekt główny spoza wod-kan – kanalizacja/woda jako zakres pokrewny
-                P["subsectors_extra"]["value"] = list(dict.fromkeys([P["subsector"]["value"]] + list(P["subsectors_extra"]["value"] or [])))
-                put("subsector", "", "", "model")
-        elif msec == rsec:
-            P["sector"]["source"] = "model i reguły"
-    v, c = field("rodzaj_robot")
-    if v in llm.WORKS_LABELS:
-        category("works_type", v, c)
-    v, c = field("zaprojektuj_i_wybuduj")
-    if v in ("tak", "nie") and (v == "nie" and not P["design_build"]["value"] or verify_quote(c, text)):
-        category("design_build", v == "tak", c, lambda x: "tak" if x else "nie")
-    v, c = field("zamawiajacy")
-    if v and len(v) < 90:
-        category("org", v, c)
-    v, c = field("miejscowosc")
-    if v and len(v) < 60:
-        category("city", v, c)
-    v, c = field("wojewodztwo")
-    code = next((k for k, (n, _) in PROVINCES.items() if n == v), None)
+    org = r["zamawiajacy"]
+    if org.get("wartosc") and len(org["wartosc"]) < 90:
+        category("org", org)
+    city = r["miejscowosc"]
+    if city.get("wartosc") and len(city["wartosc"]) < 60:
+        category("city", city)
+    w = r["wojewodztwo"]
+    code = w.get("kod")
     if code:
         rule = P["province"]["value"]
+        ok = w.get("zrodlo") not in (None, "", "brak") and verify_quote(w.get("cytat") or "", text)
         if rule and rule != code:
             conflicts["province"] = f"reguły: {PROVINCES[rule][0]}"
-        if not rule or verify_quote(c, text):
-            put("province", code, c if verify_quote(c, text) else "(wywnioskowane przez model)", "model" if rule != code else "model i reguły")
+        if not rule or ok:
+            put("province", code, w["cytat"] if ok else "(wywnioskowane przez model)", "model" if rule != code else "model i reguły")
 
     # liczby: reguły mają pierwszeństwo, model uzupełnia braki; rozbieżność > 10% – ostrzeżenie
     def number(key, value, quote, fmt=lambda x: x):
@@ -304,34 +295,35 @@ def _merge_llm(clf: Classifier, q: dict, text: str, put) -> None:
         if verify_quote(quote, text):
             put(key, value, quote, "model")
 
-    k = r.get("kwota") or {}
-    amount = parse_amount(k.get("tekst")) if k.get("tekst") else None
-    if amount and amount < 1000 and re.search(r"mln|milion", fold(k.get("tekst", ""))):
-        amount *= 1e6
-    number("budget", amount, k.get("cytat", ""), fmt_pln)
-    if P["budget"]["source"] == "model" and k.get("vat") in ("netto", "brutto"):
-        put("budget_vat", k["vat"], k.get("cytat", ""), "model")
-    d = r.get("czas_realizacji") or {}
-    n = _num(d.get("liczba"))
-    mult = {"dni": 1, "tygodnie": 7, "miesiące": 30.4375, "lata": 365.25}.get(d.get("jednostka") or "")
-    number("duration_days", int(round(n * mult)) if n and mult and 7 <= n * mult <= 3650 else None, d.get("cytat", ""), lambda x: f"{x} dni")
-    v, c = field("dlugosc_sieci_km")
-    km = _num(v)
-    number("length_km", km if km and km < 500 else None, c, lambda x: f"{x:g} km")
-    v, c = field("liczba_przylaczy")
-    con = _num(v)
-    number("connections", int(con) if con and con < 20000 else None, c)
+    k = r["planowana_kwota"]
+    if k.get("kwota") and (k.get("waluta") or "PLN") == "PLN" and k.get("zrodlo") != "brak":
+        number("budget", float(k["kwota"]), k.get("cytat", ""), fmt_pln)
+        if P["budget"]["source"] == "model" and k.get("vat") in ("netto", "brutto"):
+            put("budget_vat", k["vat"], k.get("cytat", ""), "model")
+    t = r["planowany_czas"]
+    if t.get("dni") and 7 <= t["dni"] <= 3650:
+        number("duration_days", int(t["dni"]), t.get("cytat", ""), lambda x: f"{x} dni")
 
-    # elementy techniczne: suma reguł i modelu
+    # zakres rzeczowy: długość sieci (m -> km) i liczba przyłączy – tylko pozycje z liczbą w cytacie, cytat w tekście
+    items = [x for x in r["zakres_rzeczowy"] if x.get("liczba_w_cytacie") and x.get("zrodlo") != "brak"]
+    lin = _NETWORK | ({"nawierzchnie i drogi"} if P["sector"]["value"] in ("drogi", "kolej") else set())
+    net = [x for x in items if x["element"] in lin and x["jednostka_bazowa"] == "m"]
+    if net:
+        km = round(sum(x["ilosc_bazowa"] for x in net) / 1000.0, 3)
+        number("length_km", km if km < 500 else None, max(net, key=lambda x: x["ilosc_bazowa"])["cytat"], lambda x: f"{x:g} km")
+    con = [x for x in items if x["element"] in _CONNECTIONS and x["jednostka_bazowa"] == "szt."]
+    if con:
+        n = int(sum(x["ilosc_bazowa"] for x in con))
+        number("connections", n if n < 20000 else None, con[0]["cytat"])
+
+    # elementy techniczne: suma reguł i elementów rozpoznanych w cytatach zakresu rzeczowego
     feats = list(P["features"]["value"] or [])
-    added = [label_to_feat[x] for x in (r.get("elementy") or []) if x in label_to_feat and label_to_feat[x] not in feats]
+    added = [f for f in clf.features_of(" ".join(x["cytat"] for x in items)) if f not in feats] if items else []
     if added:
         put("features", feats + added, "", "model i reguły" if feats else "model")
-    kws = [x.strip() for x in (r.get("slowa_kluczowe") or []) if isinstance(x, str) and 2 < len(x.strip()) < 60][:8]
+    kws = [x["fraza"] for x in r["slowa_kluczowe"] if x.get("w_tekscie") and 2 < len(x["fraza"]) < 60][:8]
     if kws:
         q["search_terms"] = kws
-    if r.get("streszczenie"):
-        q["summary_llm"] = r["streszczenie"].strip()
 
 
 def apply_overrides(q: dict[str, Any], overrides: dict[str, Any] | None) -> dict[str, Any]:

@@ -41,6 +41,9 @@ DEFAULTS: dict[str, Any] = {
         "api_key_env": "RISKMINER_LLM_API_KEY",
         "temperature": 0.0,
         "timeout_s": 180,
+        "ctx": 8192,            # stałe okno kontekstu modelu (Ollama)
+        "max_tokens": 1536,     # limit długości odpowiedzi
+        "keep_alive": "30m",    # jak długo Ollama trzyma model w pamięci
         "data_location": "lokalnie (bez modelu językowego – dane nie opuszczają komputera)",
         "effort": "",          # tylko claude-code: low / medium / high
         "claude_bin": "",      # tylko claude-code: ścieżka do programu claude (domyślnie z PATH)

@@ -133,36 +133,72 @@ class TestQueryUnderstanding(unittest.TestCase):
         from riskminer.query import understand
         text = ("Chcemy zbudować kanalizację w naszej gminie Lipowo w województwie warmińsko-mazurskim, mniej więcej 5 km sieci "
                 "i ze 40 przyłączy. Mamy około 6 mln zł brutto. Wykonawca ma też zaprojektować sieć.")
+        # odpowiedź w formacie ekstraktora (riskminer.ekstrakcja.SCHEMA)
         answer = {
-            "czy_konkretna_inwestycja": True,
-            "rodzaj_inwestycji": {"wartosc": "kanalizacja sanitarna", "cytat": "zbudować kanalizację"},
-            "rodzaj_robot": {"wartosc": "budowa", "cytat": "Chcemy zbudować kanalizację"},
-            "zaprojektuj_i_wybuduj": {"wartosc": "tak", "cytat": "Wykonawca ma też zaprojektować sieć"},
             "zamawiajacy": {"wartosc": "Gmina Lipowo", "cytat": "gminie Lipowo"},
+            "rodzaj_zamowienia": {"wartosc": "roboty budowlane", "cytat": "zbudować kanalizację"},
             "miejscowosc": {"wartosc": "", "cytat": ""},
-            "wojewodztwo": {"wartosc": "warmińsko-mazurskie", "cytat": "województwie warmińsko-mazurskim"},
-            "kwota": {"tekst": "6 mln zł", "vat": "brutto", "cytat": "około 6 mln zł brutto"},
-            "czas_realizacji": {"liczba": "", "jednostka": "", "cytat": ""},
-            "dlugosc_sieci_km": {"wartosc": "50", "cytat": "zmyślony cytat, którego nie ma"},   # zła liczba + fałszywy cytat
-            "liczba_przylaczy": {"wartosc": "40", "cytat": "ze 40 przyłączy"},
-            "elementy": ["przyłącza / sięgacze"],
-            "slowa_kluczowe": ["kanalizacja sanitarna", "przyłącza kanalizacyjne"],
-            "streszczenie": "Budowa ok. 5 km kanalizacji w gminie Lipowo.",
+            "wojewodztwo": {"wartosc": "warmińsko-mazurskie", "cytat": "województwie warmińsko-mazurskim", "wywnioskowane": False},
+            "planowana_kwota": {"kwota": "6 mln zł", "waluta": "PLN", "vat": "brutto", "cytat": "około 6 mln zł brutto"},
+            "planowany_czas": {"liczba": "", "jednostka": "", "data_podpisania": "", "termin_do": "", "termin_pierwotny": "", "cytat": ""},
+            "zakres_rzeczowy": [
+                {"element": "kanalizacja sanitarna (inna/nieokreślona)", "opis": "sieć", "ilosc": "50", "jednostka": "km",
+                 "parametry": "", "cytat": "zmyślony cytat, którego nie ma"},          # zła liczba + fałszywy cytat
+                {"element": "przyłącza kanalizacyjne", "opis": "przyłącza", "ilosc": "40", "jednostka": "szt.",
+                 "parametry": "", "cytat": "ze 40 przyłączy"},
+            ],
+            "slowa_kluczowe": [{"fraza": "oczyszczalnia ścieków", "kategoria": "obiekt"},     # nie ma w tekście – odrzucone
+                               {"fraza": "przyłącza", "kategoria": "zakres"}],
         }
-        with mock.patch.object(llm, "enabled", return_value=True), mock.patch.object(llm, "understand_query", return_value=answer), \
+        with mock.patch.object(llm, "enabled", return_value=True), mock.patch.object(llm, "extract_params", return_value=answer), \
                 mock.patch.object(llm, "cfg", return_value={"model": "test-model"}):
             q = understand(self.conn, text)
         P = {k: v["value"] for k, v in q["params"].items()}
         self.assertEqual(P["subsector"], "kan_san")
-        self.assertTrue(P["design_build"])                       # tylko model to wyczytał – cytat zweryfikowany
-        self.assertEqual(q["params"]["design_build"]["source"], "model")
+        self.assertEqual(P["org"], "Gmina Lipowo")
         self.assertEqual(P["budget"], 6_000_000)
-        self.assertEqual(P["length_km"], 5.0)                    # reguły (5 km) wygrywają z błędną liczbą modelu
-        self.assertIn("length_km", q["conflicts"])               # a rozbieżność jest pokazana użytkownikowi
+        self.assertEqual(P["length_km"], 5.0)                    # reguły (5 km); pozycja modelu z fałszywym cytatem odrzucona
+        self.assertNotIn("length_km", q["conflicts"])
+        self.assertEqual(P["connections"], 40)
+        self.assertEqual(q["params"]["connections"]["source"], "model i reguły")
         self.assertEqual(P["province"], "PL28")
-        self.assertEqual(q["search_terms"][0], "kanalizacja sanitarna")
+        self.assertEqual(q["search_terms"], ["przyłącza"])
         self.assertEqual(q["llm_info"]["model"], "test-model")
         self.assertFalse(q["vague"])
+
+    def test_same_prompt_as_extractor(self):
+        """Risk Miner wysyła do modelu dokładnie instrukcję, wiadomość i schemat ekstraktora."""
+        import datetime as dt
+        from unittest import mock
+        from riskminer import ekstrakcja as ek, llm
+        seen = {}
+
+        def fake(system, user, schema=None, max_tokens=1500):
+            seen.update(system=system, user=user, schema=schema, max_tokens=max_tokens)
+            return {}
+        with mock.patch.object(llm, "chat_json", side_effect=fake), mock.patch.object(llm, "cfg", return_value={"model": "m"}):
+            llm.extract_params("Gmina Rydzyna buduje 3,6 km kanalizacji.", dt.date(2026, 11, 22))
+        system, user = ek.messages("Gmina Rydzyna buduje 3,6 km kanalizacji.", dt.date(2026, 11, 22))
+        self.assertEqual((seen["system"], seen["user"], seen["schema"], seen["max_tokens"]), (system, user, ek.SCHEMA, ek.MAX_TOKENS))
+
+    def test_extraction_checks(self):
+        """Weryfikacja odpowiedzi: kwota jako zamawiający odrzucona, jednostka z cytatu, pozycja pominięta przez model dopisana."""
+        import datetime as dt
+        from riskminer import ekstrakcja as ek
+        text = ("Gmina Rydzyna przygotowuje budowę kanalizacji w miejscowości Kłoda. Zakres obejmuje 3,6 km kanalizacji grawitacyjnej "
+                "z rur PVC-U DN 200, 1,2 km rurociągu tłocznego PE DN 110, dwóch przepompowni ścieków oraz 85 przyłączy. "
+                "Wartość szacunkowa to 4,2 mln zł netto.")
+        raw = {"zamawiajacy": {"wartosc": "4,2 mln zł netto", "cytat": "4,2 mln zł netto"},
+               "zakres_rzeczowy": [{"element": "kanalizacja sanitarna grawitacyjna", "ilosc": "3,6 km", "jednostka": "m",
+                                    "cytat": "3,6 km kanalizacji grawitacyjnej z rur PVC-U DN 200"}]}
+        r = ek.postprocess(raw, text, dt.date(2026, 11, 22))
+        self.assertEqual(r["zamawiajacy"]["wartosc"], "Gmina Rydzyna")
+        self.assertIn("odrzucone", r["zamawiajacy"])
+        by_el = {x["element"]: x for x in r["zakres_rzeczowy"]}
+        self.assertEqual(by_el["kanalizacja sanitarna grawitacyjna"]["ilosc_bazowa"], 3600.0)
+        self.assertEqual(by_el["kanalizacja sanitarna tłoczna"]["ilosc_bazowa"], 1200.0)
+        self.assertTrue(by_el["kanalizacja sanitarna tłoczna"]["z_reguly"])
+        self.assertEqual(by_el["przyłącza kanalizacyjne"]["ilosc"], 85)
 
 
 class TestClaudeCodeProvider(unittest.TestCase):

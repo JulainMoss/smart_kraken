@@ -49,6 +49,9 @@ api_key_env = "RISKMINER_LLM_API_KEY"   # nazwa zmiennej środowiskowej z klucze
 temperature = 0.0
 effort = ""                    # tylko claude-code: low / medium / high
 timeout_s = 180
+ctx = 8192              # stałe okno kontekstu (Ollama); zmiana między zapytaniami = przeładowanie modelu
+max_tokens = 1536       # limit długości odpowiedzi modelu
+keep_alive = "30m"      # jak długo Ollama trzyma model w pamięci
 data_location = "lokalnie (bez modelu językowego)"   # opis wyświetlany użytkownikom: lokalnie / UE / poza UE
 
 

@@ -1,6 +1,5 @@
 # Cały projekt w kontenerach:  docker compose up -d --build
 #   Risk Miner         http://127.0.0.1:8000
-#   Ekstraktor LLM     http://127.0.0.1:8001
 #   Ollama (model)     wewnątrz sieci Dockera (http://ollama:11434); model pobierany przy pierwszym starcie
 # Ustawienia: plik .env (kopia .env.example). Karta NVIDIA: dodaj -f docker-compose.gpu.yml
 # Budowa bazy Risk Miner (jednorazowo): docker compose --profile setup run --rm baza
@@ -54,23 +53,6 @@ services:
       - riskminer-data:/app/data
       - ${BZP_KOPIA_DIR:-../risk_miner_bzp_kopia}:/bzp:ro
       - ${MATERIALY_DIR:-../Risk_Miner_materialy_dla_uczestnikow_na_start}:/materialy:ro
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      ollama:
-        condition: service_healthy
-        required: false
-
-  ekstraktor:
-    build: ./tools/ekstraktor_llm
-    image: smart-kraken/ekstraktor
-    restart: unless-stopped
-    ports:
-      - "${EKSTRAKTOR_PORT:-8001}:8001"
-    command: ["--llm-url", "${LLM_URL:-http://ollama:11434}", "--model", "${LLM_MODEL:-SpeakLeash/bielik-1.5b-v3.0-instruct:Q8_0}"]
-    volumes:
-      - ./tools/ekstraktor_llm/wyniki:/app/wyniki
-      - ./tools/ekstraktor_llm/debug:/app/debug
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
