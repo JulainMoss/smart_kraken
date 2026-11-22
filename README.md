@@ -34,7 +34,7 @@ Materiały: [prezentacja (PDF, 10 slajdów)](docs/prezentacja.pdf) · [architekt
 
 | # | Wymaganie z treści zadania | Gdzie w rozwiązaniu | Stan |
 |---|---|---|---|
-| 0 | [Szybki start i test o 11:00](#0-szybki-start) | `python -m riskminer test-run` | ✅ |
+| 0 | [Szybki start i test o 11:00](#0-szybki-start) · [scenariusz pokazu](docs/DEMO.md) | zakładka „Przetwórz pliki” · `python -m riskminer test-run` | ✅ |
 | 1 | [Problem, zakres, główny scenariusz użytkownika](#1-problem-zakres-i-scenariusz-użytkownika) (rozdz. 1–2) | zakładka „Nowa analiza” | ✅ |
 | 2 | [Oczekiwany rezultat](#2-oczekiwany-rezultat-rozdz-3) (rozdz. 3) | | |
 | 2.1 | [Automatyczne zasilanie bazy (BZP, TED, KIO, BIP, NIK, KPOŚK, pliki)](#21-automatyczne-zasilanie-bazy) | `riskminer/build.py`, `sources/` | ✅ |
@@ -73,9 +73,13 @@ python -m riskminer serve                     # http://127.0.0.1:8000
 
 ### Test jury o 11:00 (rekord dodatkowego projektu + opis nowej inwestycji)
 
-**W interfejsie:** „Import danych” → przeciągnij plik z rekordem → projekt pojawia się w „Projekty” z powiązaniami →
-przycisk **⬇ JSON / ⬇ Raport (MD) / ⬇ CSV**. Następnie „Nowa analiza” → **📄 Wczytaj dokument** (opis inwestycji) →
-„Przygotuj raport” → „Wygeneruj raport” → **⬇ Raport (Markdown)** / CSV / JSON / Drukuj do PDF.
+**W przeglądarce, jednym kliknięciem:** zakładka **Przetwórz pliki** → przeciągnij rekord projektu (XLSX/CSV) i opis
+inwestycji (DOCX/PDF/TXT) → **Przetwórz i przygotuj pliki**. Po ok. minucie gotowe są dwa pliki główne –
+`1_rekord_projektu_<ID>.md` (eksport rekordu) i `2_analiza_inwestycji_<AN-ID>.md` / `.pdf` (analiza) – oraz te same wyniki
+w JSON, CSV i ZIP (`data/wyniki/<przebieg>/`). Szczegółowa instrukcja i plan B: [docs/DEMO.md](docs/DEMO.md).
+
+**Krok po kroku w interfejsie:** „Import danych” → rekord → „Projekty” → eksport JSON/Markdown/CSV; „Nowa analiza” →
+„Wczytaj dokument” → sprawdzenie parametrów → raport → eksport Markdown/CSV/JSON lub druk do PDF.
 
 **Jednym poleceniem (bez zmian w kodzie):**
 
@@ -84,6 +88,41 @@ python -m riskminer test-run --project rekord_projektu.xlsx --investment opis_in
 # wyniki_testu/projekt_<ID>.json|.md|.csv  – eksport rekordu projektu (z powiązaniami, zmianami, zdarzeniami i źródłami)
 # wyniki_testu/AN-....md|.json|.csv        – analiza nowej inwestycji
 ```
+
+### Model językowy (opcjonalnie)
+
+Model odczytuje opis inwestycji i wypełnia formularz parametrów (rodzaj inwestycji, robót, formuła, miejsce, budżet, termin,
+skala, elementy techniczne, frazy do wyszukiwania). **Każda wartość ma cytat z opisu, który system sprawdza w tekście**; liczby są
+porównywane z regułami (pierwszeństwo mają dokładne wyrażenia), a rozbieżności są pokazywane urzędnikowi przy polu formularza.
+Bez modelu wszystko działa na regułach eksperckich. Model pisze też krótkie podsumowanie raportu prostym językiem
+(oznaczone jako *Wniosek*, wyłącznie na liczbach z raportu).
+
+**Wariant A – Claude przez Claude Code (używany w pokazie; w ramach subskrypcji Claude, bez klucza API).** Aplikacja wywołuje
+`claude -p` w trybie nieinteraktywnym: bez narzędzi, bez zapisu sesji, bez plików projektu, z wynikiem walidowanym względem
+schematu JSON (`--json-schema`). Odczyt opisu: ok. 7–14 s (Claude Opus 5.5, effort `low`).
+
+```toml
+# config.toml
+[llm]
+provider = "claude-code"
+model = "claude-opus-5-5"      # albo "claude-haiku-5-5"
+effort = "low"
+data_location = "Claude (Anthropic) przez Claude Code – opis jest wysyłany do usługi Claude"
+```
+
+Warunek: zainstalowany i zalogowany Claude Code (`claude`, potem `/login`). To rozwiązanie do własnego użytku zespołu (pokaz, test);
+system produkcyjny dla wielu urzędników powinien korzystać z klucza API lub modelu lokalnego.
+
+**Wariant B – lokalny model (dane nie opuszczają komputera), bez internetu:**
+
+```bash
+# llama.cpp (CPU, bez karty graficznej): https://github.com/ggml-org/llama.cpp/releases – plik ubuntu-x64 do ../llm_runtime/bin/
+# model GGUF do ../llm_runtime/models/, np. Bielik-1.5B-v3.0-Instruct.Q8_0.gguf (SpeakLeash) lub qwen2.5-3b-instruct-q4_k_m.gguf
+scripts/start_llm.sh [plik.gguf]        # serwer zgodny z OpenAI na http://127.0.0.1:8080, tylko lokalnie
+# config.toml, sekcja [llm]:  provider = "openai", base_url = "http://127.0.0.1:8080", model = "<nazwa>"
+```
+
+Zamiast llama.cpp: Ollama (np. Bielik 11B) albo dowolne API zgodne z OpenAI (np. Mistral w UE) – zmiana tylko w `config.toml`.
 
 ---
 
@@ -218,6 +257,10 @@ Raport (zakładka „Nowa analiza”, zapisywany jako rekord w `analyses`):
   stroną i **gotową wiadomością**; gdy danych jest mało – wyraźny komunikat i zachęta do kontaktu.
 * **Rozróżnienie rodzaju informacji** w całym raporcie: *Dane źródłowe* / *Obliczenia* / *Wniosek / rekomendacja* (reguły lub model).
 
+**Odczyt opisu:** model językowy (lokalny) + reguły; przy każdym parametrze źródło (*model*, *reguły*, *model i reguły – zgodne*,
+*poprawione*) i cytat. Opis zbyt ogólny („planujemy jakąś inwestycję”) daje czerwoną flagę i prośbę o uzupełnienie – raport nie udaje pewności.
+Słowa potoczne („w naszej gminie”, „chcemy”) nie trafiają do wyszukiwania; terminy potoczne („rok na realizację”, „półtora roku”) są rozumiane.
+
 ### 2.7 Rozwój (funkcje dodatkowe)
 
 * **Moduł monitorowania** – dla postępowań w realizacji powiązanych z projektami sprawdza API BZP pod kątem nowych ogłoszeń
@@ -225,10 +268,16 @@ Raport (zakładka „Nowa analiza”, zapisywany jako rekord w `analyses`):
 * **Sieć kontaktów** – „do kogo się zwrócić” z gotowym e-mailem (pomysł z pytań do mentorów).
 * **Wielosektorowość** – sektory i podsektory w bazie; BZP innych sektorów (drogi, kubatura, energetyka, kolej) ładowane z `data_lake`.
 * **Przypadki wzorcowe**, **ocena skuteczności działań**, **wykrywanie błędów w danych wejściowych**.
+* **Dodaj dane z BIP** (Import danych) – urzędnik wkleja adres strony BIP albo bezpośredni link do PDF/DOCX (lub kopiuje treść strony);
+  system pobiera stronę i jej załączniki (protokoły, aneksy, umowy, zarządzenia), zapisuje je z adresem źródła i SHA-256, opcjonalnie
+  przypina do projektu i wskazuje fragmenty ryzyka (z numerem strony) do weryfikacji eksperta. `riskminer/bip_import.py`
+* **Przetwórz pliki** – rekord projektu + opis inwestycji → komplet plików wyników jednym kliknięciem (Markdown, JSON, CSV, PDF z tekstem, ZIP).
+  `riskminer/pipeline.py`
 
 ### 2.8 Przystępność
 
-Interfejs po polsku, jasny i stonowany (styl administracji), kroki 1-2-3, podpowiedzi „co warto napisać”, przykłady,
+Interfejs po polsku, w konwencji znanej z narzędzi biurowych i administracyjnych (wzorce GitHub Primer i Microsoft Fluent:
+płaskie powierzchnie, czytelna typografia systemowa, ikony liniowe zamiast emoji, zakładki z licznikami), kroki 1-2-3, podpowiedzi „co warto napisać”, przykłady,
 objaśnienia liczb („jak czytać medianę i przedział”), etykiety dla danych/obliczeń/wniosków, eksport do formatów biurowych
 (CSV dla Excela, druk do PDF). Nie wymaga instalacji niczego poza Pythonem; strona działa w każdej przeglądarce.
 
@@ -299,7 +348,8 @@ Polecenia CLI:
 | `python -m riskminer import PLIK.xlsx [--offline] [--no-external]` | import projektów + wzbogacenie |
 | `python -m riskminer analyze OPIS.docx --out katalog/` | analiza nowej inwestycji → MD/JSON/CSV |
 | `python -m riskminer export-project RM-2026-001 --out katalog/` | eksport rekordu projektu |
-| `python -m riskminer test-run --project P.xlsx --investment O.docx --out wyniki/` | pełna ścieżka testowa |
+| `python -m riskminer test-run --project P.xlsx --investment O.docx --out wyniki/` | pełna ścieżka testowa (to samo co „Przetwórz pliki”) |
+| `scripts/start_llm.sh [model.gguf]` | lokalny model językowy (llama.cpp, API zgodne z OpenAI na :8080) |
 | `python -m riskminer extras` | KIO, TED, BZP wielosektorowe, KPOŚK z `data_lake` |
 | `python -m riskminer link-report --out docs/raport_testu_laczenia.md` | raport z testu łączenia |
 
@@ -372,7 +422,11 @@ docs/                   architektura, raport z testu łączenia, przykładowe ek
 | Python 3 (biblioteka standardowa, SQLite FTS5) | PSF / public domain |
 | Testy | `python -m unittest discover tests` (parser BZP, kwoty, okresy, NIP/KPO, klasyfikacja, ekstrakcja) |
 | Opcjonalnie: pypdf (BSD), poppler-utils (GPL, narzędzie zewnętrzne), LibreOffice (MPL), tesseract (Apache 2.0) | |
-| Opcjonalnie: model Bielik (SpeakLeash, Apache 2.0) przez Ollamę (MIT) lub API zgodne z OpenAI | wg dostawcy |
+| Opcjonalnie: Claude (Anthropic) przez Claude Code – odczyt opisu i podsumowanie raportu (wariant użyty w pokazie) | warunki subskrypcji Claude / API Anthropic |
+| Opcjonalnie: llama.cpp (MIT) – lokalny serwer modelu | MIT |
+| Opcjonalnie: Bielik-1.5B-v3.0-Instruct / Bielik-11B (SpeakLeash) – polski model, zalecany do zastosowań w administracji | Apache 2.0 |
+| Opcjonalnie: Qwen2.5-3B-Instruct (Alibaba) – do prototypu; licencja badawcza (bez zastosowań komercyjnych); Qwen2.5-1.5B/7B – Apache 2.0 | Qwen Research / Apache 2.0 |
+| Opcjonalnie: Ollama (MIT) lub dowolne API zgodne z OpenAI | wg dostawcy |
 
 Dane osobowe: system przetwarza wyłącznie publiczne dane kontaktowe zamawiających (instytucji) z ogłoszeń BZP.
 
@@ -387,7 +441,8 @@ Dane osobowe: system przetwarza wyłącznie publiczne dane kontaktowe zamawiają
 * Baza Konkurencyjności 2021 – aplikacja SPA bez publicznego API; konektor zaprojektowany (harvester diagnozuje endpoint), nie wchodzi do analiz.
 * Pełne pobieranie dokumentów postępowań z platform zakupowych (SWZ, PFU, PPU) – linki do platform są w bazie (`platform_url`),
   pobieranie wymaga obsługi wielu platform (Logintrade, platformazakupowa.pl, e-Zamówienia).
-* Model językowy do klasyfikacji zdarzeń niesklasyfikowanych (kategoria BRAK) – interfejs gotowy (`llm.py`), domyślnie wyłączony.
+* Model językowy do klasyfikacji zdarzeń niesklasyfikowanych (kategoria BRAK) – interfejs gotowy (`llm.py`); model jest dziś używany
+  do odczytu opisu nowej inwestycji (formularz parametrów) i opcjonalnego streszczenia raportu.
 * PostgreSQL + pgvector zamiast SQLite dla wielu sektorów i milionów dokumentów.
 
 **Ograniczenia danych (komunikowane w raportach):** brak informacji w ogłoszeniu ≠ brak zdarzenia; ogłoszenie o wykonaniu umowy

@@ -90,6 +90,13 @@ def extract_duration_days(text: str) -> dict[str, Any] | None:
         days = int(round(n * mul))
         if 7 <= days <= 3650:
             return {"days": days, "quote": text[max(0, m.start() - 40):m.end() + 10]}
+    # potocznie: „rok na realizację”, „w ciągu roku”, „półtora roku”, „dwa lata”
+    for rx, d in ((r"\bpoltora roku\b", 548), (r"\bpol roku\b", 183),
+                  (r"\b(rok|roku)\s+na\s+(realizac|wykonan|budow|robot)|\bw ciagu (jednego )?roku\b|\bprzez (jeden )?rok\b", 365),
+                  (r"\b(dwa|dwoch) lat", 730), (r"\b(trzy|trzech) lat", 1096)):
+        m = re.search(rx, t)
+        if m:
+            return {"days": d, "quote": text[max(0, m.start() - 30):m.end() + 15]}
     return None
 
 

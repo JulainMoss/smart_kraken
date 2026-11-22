@@ -58,7 +58,7 @@ th{color:#5d6876;font-size:15px;text-transform:uppercase}
 <div class="step"><i>1</i><div><p style="margin:0"><b>Opis inwestycji</b> – wklejony tekst albo wstępne dokumenty (DOCX, PDF).</p></div></div>
 <div class="step"><i>2</i><div><p style="margin:0"><b>Sprawdzenie parametrów</b> – podsektor, skala, budżet, termin, elementy techniczne; każdy z cytatem z opisu.</p></div></div>
 <div class="step"><i>3</i><div><p style="margin:0"><b>Raport</b> – ryzyko opóźnienia, realny czas i koszt, ocena budżetu (zł/km), czerwone flagi, problemy z dowodami, rekomendacje, zapisy umowne, <b>kontakty</b> do gmin, które to robiły.</p></div></div>
-<div class="box">Działa bez modelu językowego i bez internetu. Model (np. polski Bielik lokalnie) – opcjonalnie, w konfiguracji.</div>
+<div class="box">Działa bez modelu językowego i bez internetu. Model – opcjonalnie: Claude wypełnia formularz z opisu (każda wartość z cytatem sprawdzanym w tekście) i streszcza raport; offline – lokalny Bielik / Qwen.</div>
 </div><div><img src="img/analiza.png" style="max-height:470px"></div></div>
 <span class="n">3</span></section>
 
@@ -121,10 +121,10 @@ th{color:#5d6876;font-size:15px;text-transform:uppercase}
 <section class="s"><div class="bar"></div><h2>Architektura i wdrożenie</h2>
 <div class="grid g3">
 <div class="m"><b style="font-size:28px">0 zależności</b><span>biblioteka standardowa Pythona, SQLite + FTS5, strona bez frameworków; Docker; jeden proces</span></div>
-<div class="m"><b style="font-size:28px">Model wymienny</b><span>none / Ollama (Bielik – lokalnie) / API zgodne z OpenAI (np. Mistral – UE); zmiana w config.toml</span></div>
+<div class="m"><b style="font-size:28px">Model wymienny</b><span>none / Claude (Claude Code) / llama.cpp lub Ollama (Bielik – lokalnie) / API zgodne z OpenAI; zmiana w config.toml</span></div>
 <div class="m"><b style="font-size:28px">1–2 s</b><span>analiza nowej inwestycji na 45 tys. postępowań; eksport JSON / CSV / Markdown / PDF</span></div></div>
 <ul style="margin-top:28px"><li>Model danych: projekty, postępowania, ogłoszenia, umowy, zmiany, zdarzenia, dokumenty, źródła, historia decyzji.</li>
-<li>Dane przetwarzane lokalnie; tylko publiczne dane instytucji; rejestr operacji; licencja MIT.</li>
+<li>Baza i analizy lokalnie, model wg konfiguracji (lokalny lub Claude); tylko publiczne dane instytucji; rejestr operacji; licencja MIT.</li>
 <li>Skalowanie: reguły, sektory i wagi w bazie; SQLite → PostgreSQL bez zmiany modelu.</li></ul>
 <span class="n">9</span></section>
 

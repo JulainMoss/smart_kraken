@@ -21,6 +21,12 @@ GENERIC_STEMS = {"budow", "siec", "sieci", "wraz", "robot", "zadani", "realiz", 
                  "inwest", "projek", "ul", "dz", "nr", "obreb", "terenie", "teren", "przedm", "zamowi", "ramach", "etap", "czesc",
                  "dotycz", "wykon", "polega", "obejmu", "planuj", "planow"}
 
+# słowa potoczne z opisów pisanych przez urzędnika – nie niosą treści technicznej (np. „w naszej gminie” ≠ „ulica Naszej”)
+QUERY_STOP = set("""nasz nasza nasze naszej naszego naszym naszych nasza naszą chcemy chce chcę chcielibysmy chcielibyśmy planujemy planuje
+zamierzamy potrzebujemy musimy bedziemy będziemy mamy mam prosze proszę pomoc pomocy jakas jakaś jakis jakiś jakies jakieś jakiej
+okolo około mniej wiecej więcej przyszlym przyszłym przyszly przyszły nastepnym następnym tego takze także bardzo dobrze moze może
+ktos ktoś cos coś czyli wlasnie właśnie""".split())
+
 WORKS_GROUPS = [{"budowa", "rozbudowa"}, {"przebudowa", "modernizacja", "remont/renowacja"}]
 VAT = 1.23
 
@@ -29,7 +35,7 @@ def _fts_query(text: str, max_terms: int = 40) -> str:
     seen, terms = set(), []
     for t in tokens(text):
         s = stem(t)
-        if len(s) < 3 or s in seen or s in GENERIC_STEMS or s.isdigit() or t in STOPWORDS:
+        if len(s) < 3 or s in seen or s in GENERIC_STEMS or s.isdigit() or t in STOPWORDS or t in QUERY_STOP:
             continue
         seen.add(s)
         terms.append(s)
@@ -67,7 +73,8 @@ def search(conn: sqlite3.Connection, q: dict[str, Any], top_k: int | None = None
     boost = setting(conn, "report.exemplary_boost", 0.05)
     text = q.get("text", "")
     # do zapytania tekstowego: pierwsze ~2500 znaków + elementy techniczne
-    ftsq = _fts_query(text[:2500] + " " + " ".join(q.get("labels", {}).get("features", [])))
+    # słowa kluczowe od modelu językowego (jeśli był użyty) idą na początek – nie zostaną obcięte limitem terminów
+    ftsq = _fts_query(" ".join(q.get("search_terms") or []) + " " + text[:2500] + " " + " ".join(q.get("labels", {}).get("features", [])))
     cands: dict[str, float] = {}
     if ftsq:
         try:
