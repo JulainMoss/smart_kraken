@@ -20,3 +20,13 @@ data/*.log
 
 # wyniki analiz zapisywane przez serwer ekstraktora
 wyniki/
+
+# Docker – lokalne ustawienia
+.env
+
+# kopia BZP (2,7 GB) – trzymać obok repozytorium: ../risk_miner_bzp_kopia/
+bzp/
+risk_miner_bzp_kopia/
+*.jsonl
+*.jsonl.xz
+*.jsonl.idx

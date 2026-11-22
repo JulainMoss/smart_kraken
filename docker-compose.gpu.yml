@@ -1,0 +1,11 @@
+# Model na karcie NVIDIA (Docker Desktop + WSL 2 + aktualny sterownik):
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
