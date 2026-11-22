@@ -17,7 +17,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Callable
 
-from .classify import Classifier
+from .classify import time_extension_days, Classifier
 from .db import j, log_expert, log_source, one, rows, unj
 from .docs import full_text, read_any, split_sentences
 from .query import PROVINCES, TERYT_TO_PL
@@ -142,8 +142,9 @@ def import_table(conn: sqlite3.Connection, filename: str, data: bytes, progress:
                      f"ON CONFLICT(project_id) DO UPDATE SET {','.join(f'{c}=excluded.{c}' for c in cols if c != 'project_id')}",
                      [rec[c] for c in cols])
         imported.append(pid)
+        n_rec = record_events(conn, pid)
         if progress:
-            progress(f"Wczytano projekt {pid}: {title[:60]}")
+            progress(f"Wczytano projekt {pid}: {title[:60]}" + (f" – w treści rekordu rozpoznano {n_rec} zdarzeń ryzyka" if n_rec else ""))
     log_source(conn, "PLIK", f"import tabeli projektów ({len(imported)} rekordów)", filename, 200, len(imported),
                sha256=hashlib.sha256(data).hexdigest())
     conn.commit()
@@ -450,6 +451,10 @@ def enrich_project(conn: sqlite3.Connection, project_id: str, live: bool = True,
     conn.commit()
     results["summary"] = summ
     say("Gotowe.")
+    from .expert_policy import auto_approve
+    results["auto_approved"] = auto_approve(conn)
+    if results["auto_approved"]:
+        say(f"Polityka eksperta: zatwierdzono {results['auto_approved']} zdarzeń o wysokim prawdopodobieństwie.")
     return results
 
 
@@ -503,9 +508,30 @@ def import_document(conn: sqlite3.Connection, filename: str, data: bytes, projec
     if project_id:
         _add_link(conn, project_id, "document", doc_id, filename, "PLIK", None, "dokument wgrany przez użytkownika", 1.0, ["wgrany ręcznie"], "approved")
     n_ev = analyze_document(conn, doc_id)
+    from .expert_policy import auto_approve
+    auto_approve(conn, "doc_id=?", (doc_id,))
     log_source(conn, "PLIK", "wgranie dokumentu", filename, 200, 1, sha256=sha)
     conn.commit()
     return {"doc_id": doc_id, "pages": len(parsed["pages"]), "chars": len(full_text(parsed["pages"])), "events": n_ev, "kind": parsed["kind"]}
+
+
+def record_events(conn: sqlite3.Connection, project_id: str) -> int:
+    """Wiedza wpisana w rekord projektu (adnotacja instytucji, zakres, opis) -> dokument „rekord projektu” + zdarzenia ryzyka
+    (z cytatem i wskazaniem kolumny). Wpisy instytucji traktujemy jako wiarygodne: niższy próg rozpoznania, bez obniżania pewności."""
+    p = one(conn, "SELECT * FROM projects WHERE project_id=?", (project_id,))
+    if not p:
+        return 0
+    text = "\n".join(x for x in (p.get("annotation"), p.get("scope")) if x and str(x).strip())
+    if len(text.strip()) < 20:
+        return 0
+    doc_id = "REC-" + re.sub(r"[^A-Za-z0-9._-]", "_", project_id)
+    _store_doc(conn, doc_id, project_id, None, "REKORD", "rekord projektu", f"Rekord projektu {project_id} – adnotacja instytucji i zakres",
+               None, [(1, text)], meta={"źródło": p.get("source_file"), "wersja": p.get("record_version"), "data": p.get("record_date")})
+    _add_link(conn, project_id, "document", doc_id, f"Rekord projektu {project_id} – adnotacja instytucji", "REKORD", None,
+              "treść rekordu projektu", 1.0, [f"plik: {p.get('source_file') or ''}"], "approved")
+    # wpis instytucji jest źródłem wiarygodniejszym niż strona WWW: niższy próg rozpoznania, premia za źródło (maks. 0,95)
+    return analyze_document(conn, doc_id, min_conf=0.5, factor=1.1, event_type="zdarzenie wskazane w rekordzie projektu",
+                            method="reguła (katalog ekspercki) – treść rekordu projektu")
 
 
 def _doc_type(filename: str, text: str) -> str:
@@ -518,7 +544,8 @@ def _doc_type(filename: str, text: str) -> str:
     return "dokument"
 
 
-def analyze_document(conn: sqlite3.Connection, doc_id: str) -> int:
+def analyze_document(conn: sqlite3.Connection, doc_id: str, min_conf: float = 0.75, factor: float = 0.9,
+                     event_type: str = "fragment dokumentu wskazujący na ryzyko", method: str = "reguła (katalog ekspercki) – dokument") -> int:
     """Znajduje w dokumencie fragmenty świadczące o ryzyku (zdania dopasowane do katalogu) – z numerem strony."""
     from .textutil import zunpack
     d = one(conn, "SELECT * FROM documents WHERE doc_id=?", (doc_id,))
@@ -538,7 +565,7 @@ def analyze_document(conn: sqlite3.Connection, doc_id: str) -> int:
             if _boilerplate(sent):
                 continue
             # w dokumentach wymagamy co najmniej dwóch niezależnych sygnałów (mniej fałszywych trafień)
-            codes = [c for c in clf.classify_risk(sent, max_codes=1) if c["confidence"] >= 0.75 and c["status"] == "active"]
+            codes = [c for c in clf.classify_risk(sent, max_codes=1) if c["confidence"] >= min_conf and c["status"] == "active"]
             if not codes:
                 continue
             key = (codes[0]["code"], fold(sent)[:80])
@@ -546,11 +573,12 @@ def analyze_document(conn: sqlite3.Connection, doc_id: str) -> int:
                 continue
             seen.add(key)
             c = codes[0]
-            conn.execute("""INSERT INTO risk_events (tender_id,project_id,doc_id,event_type,risk_code,cause,effect_types,quote,source_system,source_ref,source_url,
-                locator,matched_terms,confidence,method,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                         (d.get("tender_id"), d.get("project_id"), doc_id, "fragment dokumentu wskazujący na ryzyko", c["code"], sent[:500],
-                          j(clf.effect_types(sent)), sent, d.get("source_system"), d.get("title"), d.get("url"), f"strona {pno}",
-                          j(c["terms"]), round(c["confidence"] * 0.9, 2), "reguła (katalog ekspercki) – dokument", "pending", now_iso()))
+            conn.execute("""INSERT INTO risk_events (tender_id,project_id,doc_id,event_type,risk_code,cause,effect_types,effect_time_days,quote,
+                source_system,source_ref,source_url,locator,matched_terms,confidence,method,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                         (d.get("tender_id"), d.get("project_id"), doc_id, event_type, c["code"], sent[:500],
+                          j(clf.effect_types(sent)), time_extension_days(sent), sent, d.get("source_system"), d.get("title"), d.get("url"),
+                          f"strona {pno}" if not doc_id.startswith("REC-") else "rekord projektu – kolumna „Adnotacja instytucji” / zakres",
+                          j(c["terms"]), round(min(0.95, c["confidence"] * factor), 2), method, "pending", now_iso()))
             n += 1
             if n >= 60:
                 break

@@ -103,6 +103,12 @@ def understand(conn: sqlite3.Connection, text: str, use_llm: bool = True) -> dic
     db_ = clf.design_build(text)
     put("design_build", db_, _quote(text, r"zaprojektuj|projektuj i buduj|\bpfu\b|zaprojektowani") if db_ else "")
     b = extract_budget(text)
+    if not b:
+        w = amount_from_words(text)
+        if w and w[0] >= 10_000:
+            vat = "netto" if re.search(r"netto", fold(text[text.find(w[1]):text.find(w[1]) + len(w[1]) + 30])) else \
+                  "brutto" if re.search(r"brutto", fold(text[text.find(w[1]):text.find(w[1]) + len(w[1]) + 30])) else "nieokreślone"
+            b = {"value": w[0], "quote": w[1], "vat": vat}
     put("budget", b["value"] if b else None, b["quote"] if b else "")
     put("budget_vat", b["vat"] if b else "nieokreślone")
     d = extract_duration_days(text)
@@ -179,6 +185,27 @@ def _num(s: str) -> float | None:
         return float(WORD_NUM[s])
     m = re.search(r"\d+(?:[.,]\d+)?", s.replace(" ", ""))
     return float(m.group(0).replace(",", ".")) if m else None
+
+
+_UNITS = {"pol": 0.5, "poltora": 1.5, "jeden": 1, "jedna": 1, "dwa": 2, "dwie": 2, "trzy": 3, "cztery": 4, "piec": 5, "szesc": 6,
+          "siedem": 7, "osiem": 8, "dziewiec": 9, "dziesiec": 10, "jedenascie": 11, "dwanascie": 12, "pietnascie": 15, "dwadziescia": 20,
+          "trzydziesci": 30, "czterdziesci": 40, "piecdziesiat": 50, "sto": 100, "dwiescie": 200, "trzysta": 300, "czterysta": 400,
+          "piecset": 500, "szescset": 600, "siedemset": 700, "osiemset": 800, "dziewiecset": 900}
+_MULTS = (("miliard", 1e9), ("mld", 1e9), ("milion", 1e6), ("mln", 1e6), ("tysiac", 1e3), ("tysiec", 1e3), ("tys", 1e3))
+
+
+def amount_from_words(text: str) -> tuple[float, str] | None:
+    """„półtora miliona złotych” -> 1 500 000; „dwa i pół miliona” -> 2 500 000; „osiemset tysięcy” -> 800 000."""
+    f = fold(text)
+    words = "|".join(sorted(_UNITS, key=len, reverse=True))
+    m = re.search(rf"\b((?:(?:{words})\s+)+)(i\s+pol\s+)?(miliard\w*|mld|milion\w*|mln|tysi\w*|tys)\b", f)
+    if not m:
+        return None
+    base = sum(_UNITS[w] for w in m.group(1).split() if w in _UNITS)
+    if m.group(2):
+        base += 0.5
+    mult = next(v for k, v in _MULTS if m.group(3).startswith(k))
+    return base * mult, text[m.start():m.end()]
 
 
 def _is_vague(P: dict) -> bool:
@@ -306,6 +333,9 @@ def _merge_llm(clf: Classifier, q: dict, text: str, put) -> None:
 
     k = r.get("kwota") or {}
     amount = parse_amount(k.get("tekst")) if k.get("tekst") else None
+    if not amount and k.get("tekst"):
+        w = amount_from_words(k["tekst"])
+        amount = w[0] if w else None
     if amount and amount < 1000 and re.search(r"mln|milion", fold(k.get("tekst", ""))):
         amount *= 1e6
     number("budget", amount, k.get("cytat", ""), fmt_pln)

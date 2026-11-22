@@ -224,7 +224,7 @@ class Classifier:
 def time_extension_days(text: str) -> int | None:
     """'wydłużenie terminu o 2 miesiące' -> 61; 'przedłużenie terminu o 45 dni' -> 45."""
     t = fold(text)
-    m = re.search(r"(?:wydluz|przedluz|zmian|przesun)\w*\s+(?:terminu|okresu|czasu)[^0-9]{0,60}?o\s*(\d{1,4})\s*(dni|dzien|tyg\w*|miesi\w*|m-c\w*)", t)
+    m = re.search(r"(?:wydluz|przedluz|zmian|przesun)\w*\s+(?:termin\w*|okres\w*|czas\w*)[^0-9]{0,60}?o\s*(\d{1,4})\s*(dni|dzien|tyg\w*|miesi\w*|m-c\w*)", t)
     if not m:
         m = re.search(r"o\s*(\d{1,4})\s*(dni|tyg\w*|miesi\w*)\s*(?:kalendarzow\w*\s*)?(?:dluzej|wydluz|przedluz)", t)
     if m:

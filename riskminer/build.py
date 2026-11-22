@@ -149,6 +149,8 @@ def aggregate_tenders(conn: sqlite3.Connection, tender_ids: Iterable[str] | None
         if progress_every and i % progress_every == 0:
             print(f"  postępowania: {i:,}/{len(tender_ids):,} ({time.time() - t0:.0f} s)", flush=True)
     conn.commit()
+    from .expert_policy import auto_approve
+    auto_approve(conn)
     return len(tender_ids)
 
 

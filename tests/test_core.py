@@ -215,3 +215,32 @@ class TestFallbackChain(unittest.TestCase):
             self.assertEqual(calls, ["glowny", "zapasowy"])
             self.assertEqual(llm.last_used()["model"], "zapasowy")
             self.assertTrue(llm.last_used()["fallback"])
+
+
+class TestExpertKnowledge(unittest.TestCase):
+    """Wiedza wpisana w rekord projektu trafia do bazy jako zdarzenia; pewne zdarzenia zatwierdza polityka eksperta."""
+
+    def test_record_annotation_events_and_auto_approval(self):
+        import tempfile
+        from riskminer import db
+        from riskminer.expert_policy import auto_approve
+        from riskminer.importer import import_table
+        with tempfile.TemporaryDirectory() as tmp:
+            db.DB_PATH = Path(tmp) / "k.sqlite"
+            conn = db.connect()
+            db.seed_knowledge(conn)
+            csv = ("Identyfikator rekordu;Nazwa przedsięwzięcia;Identyfikator odbiorcy;Nazwa odbiorcy;Adnotacja instytucji\n"
+                   "RM-TEST-1;Budowa kanalizacji sanitarnej w Testowie;7740001454;Gmina Testowo;"
+                   "Aneksem nr 2 przedłużono termin realizacji o 90 dni z powodu kolizji z niezinwentaryzowaną siecią gazową. "
+                   "Wykonawca wykonał roboty dodatkowe w zakresie odtworzenia nawierzchni.\n").encode("utf-8")
+            res = import_table(conn, "rekord.csv", csv)
+            self.assertEqual(res["imported"], ["RM-TEST-1"])
+            ev = conn.execute("SELECT risk_code, effect_time_days, confidence, status, locator FROM risk_events WHERE project_id='RM-TEST-1'").fetchall()
+            self.assertTrue(ev, "brak zdarzeń z adnotacji rekordu")
+            self.assertIn(90, [e[1] for e in ev])
+            n = auto_approve(conn)
+            st = {e[0] for e in conn.execute("SELECT status FROM risk_events WHERE project_id='RM-TEST-1' AND confidence>=0.8")}
+            self.assertTrue(n == 0 or st == {"approved"})
+            hist = conn.execute("SELECT COUNT(*) FROM expert_log WHERE action='zatwierdzenie automatyczne'").fetchone()[0]
+            self.assertEqual(hist, n)
+            conn.close()

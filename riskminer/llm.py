@@ -279,7 +279,8 @@ Zasady:
 - zaprojektuj_i_wybuduj: "tak" tylko, gdy wykonawca ma też zaprojektować obiekt (formuła „zaprojektuj i wybuduj”, PFU).
 - zamawiajacy: nazwa instytucji (np. „Gmina Lipowo”). miejscowosc: w mianowniku. Bez adresów.
 - wojewodztwo: z listy; podaj także, gdy jednoznacznie wynika z nazwy powiatu lub znanego miasta.
-- kwota.tekst: PRZEPISZ kwotę tak jak w opisie, z „mln” lub „tys.” (np. "6 mln zł"); vat: netto / brutto / nieokreślone.
+- kwota.tekst: kwota CYFRAMI z „mln” lub „tys.” (np. "6 mln zł"; „półtora miliona” -> "1,5 mln zł"); gdy podano zakres
+  („od 4 do 5 mln”) – środek zakresu ("4,5 mln zł"); vat: netto / brutto / nieokreślone; cytat – dosłownie z opisu.
 - czas_realizacji: liczba (np. "18", "1", "półtora") i jednostka; „rok na realizację” = liczba "1", jednostka "lata".
 - dlugosc_sieci_km: łączna długość sieci, rurociągów, drogi lub torów w km (np. "10,7"); gdy podano w metrach – przelicz na km.
 - liczba_przylaczy: liczba przyłączy, jeśli podana.
