@@ -517,7 +517,7 @@ def import_document(conn: sqlite3.Connection, filename: str, data: bytes, projec
 
 # zdanie z rekordu jest zdarzeniem tylko, gdy opisuje, że coś SIĘ STAŁO (nie: sama kwota dofinansowania czy cel projektu)
 EVENT_SIGNAL = (r"aneks|przedluz|wydluz|opozni|zmian\w* (umowy|terminu|zakresu|wynagrodz)|kolizj|robot\w* (dodatkow|zamienn|nieprzewidz)|"
-                r"uniewazni|odstapi|rozwiaz\w* umow|kar\w* umown|spor|sad|kio|odwola|niewykona|nienalezyt|wzrost\w* (koszt|cen|wartosc)|"
+                r"uniewazni|odstapi|rozwiaz\w* umow|kar\w* umown|\bspor(?!t)|\bsad(?!z)|\bkio\b|odwola|niewykona|nienalezyt|wzrost\w* (koszt|cen|wartosc)|"
                 r"zwieksz\w* (wynagrodz|wartosc|koszt)|przekrocz|wstrzyma|problem|trudnos|awari|upadlos|zejscie wykonawcy|nie (uzyskano|zawarto)|brak\w* (zgod|decyzj|pozwol)")
 
 
