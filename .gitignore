@@ -14,3 +14,6 @@ pliki/
 
 # zapis zapytań i odpowiedzi modelu (debug)
 debug/
+
+# wyniki analiz zapisywane przez serwer
+wyniki/
