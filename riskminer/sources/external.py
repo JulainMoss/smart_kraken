@@ -184,7 +184,8 @@ def crawl_site(start_urls: list[str], keywords: list[str], max_pages: int = 40, 
         text = html_to_text(raw)
         ftext = fold(text)
         score, ok = score_text(ftext)
-        if ok and anchor != "start" and len(text) > 200:
+        listing = re.search(r"/tag/|[?&](s|q|query|szukaj|search)=|/szukaj|/wyszukiw|/search|/kategori", url.lower())
+        if ok and anchor != "start" and len(text) > 200 and not listing:
             title = re.search(r"<title>(.*?)</title>", raw, re.S | re.I)
             hits.append({"url": url, "title": htmlmod.unescape(title.group(1).strip()) if title else anchor, "kind": "strona",
                          "pages": [(1, text[:60000])], "score": score, "sha256": hashlib.sha256(body).hexdigest(), "mime": "text/html", "bytes": len(body)})

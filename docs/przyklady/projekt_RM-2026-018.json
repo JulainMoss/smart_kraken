@@ -1,0 +1,391 @@
+{
+  "schema": "riskminer.project_record/1.0",
+  "exported_at": "2026-11-22T01:07:49+01:00",
+  "project": {
+    "project_id": "RM-2026-018",
+    "title": "Budowa kanalizacji sanitarnej w miejscowości Baszków Gmina Zduny – etap II",
+    "org_name": "Gmina Zduny",
+    "org_id_type": "NIP",
+    "org_id": "6211694095",
+    "org_type": "Jednostka samorządu terytorialnego",
+    "province": "PL30",
+    "teryt": "30",
+    "city": "Zduny",
+    "scope": "całe postępowanie",
+    "public_id_type": "Projekt KPO",
+    "public_id": "KPOD.03.15-IW.27-0107/25",
+    "public_id_norm": "KPOD.03.15-IW.27-0107/25",
+    "theme": "Gospodarka wodno-ściekowa",
+    "order_type": "Roboty budowlane",
+    "legal_regime": "Ustawa Pzp – zamówienie krajowe",
+    "currency": "PLN",
+    "status": "Zakończone",
+    "record_source": "Rejestr publiczny",
+    "record_date": "2026-11-20",
+    "record_version": "2.0",
+    "annotation": "KPO, inwestycja B3.1.1. Wartość przedsięwzięcia: 3 847 757,34 zł; dofinansowanie: 3 128 258,00 zł. Opis: „Projekt dotyczy budowy kanalizacji sanitarnej w miejscowości Baszków, obejmującej kanały KS2 i KS4. Głównym celem projektu jest zapewnienie sprawnego odprowadzania ścieków sanitarnych z obszaru objętego inwestycją do istniejącego systemu kanalizacyjnego. Projekt obejmuje: Budowę kanałów głównych KS2 i KS4. Wykonanie przykanalików – odcinków od kanału głównego do przyłączy do granic posesji, zlokalizowanych wzdłuż tras kanałów, zakończonych studniami przyłączeniowymi.”",
+    "project_value": 3847757.34,
+    "grant_value": 3128258.0,
+    "programme": "KPO, PROW 2014–2020",
+    "sector": "wod-kan",
+    "subsector": "kan_san",
+    "source_file": "Risk_Miner_dane_projekty.xlsx",
+    "raw": {
+      "Lp.": "18",
+      "Identyfikator rekordu": "RM-2026-018",
+      "Rodzaj identyfikatora odbiorcy": "NIP",
+      "Identyfikator odbiorcy": "6211694095",
+      "Nazwa odbiorcy": "Gmina Zduny",
+      "Typ odbiorcy": "Jednostka samorządu terytorialnego",
+      "Kraj": "Polska",
+      "Kod województwa (TERYT)": "30",
+      "Województwo": "wielkopolskie",
+      "Siedziba odbiorcy": "Zduny",
+      "Nazwa przedsięwzięcia": "Budowa kanalizacji sanitarnej w miejscowości Baszków Gmina Zduny – etap II",
+      "Zakres rekordu": "całe postępowanie",
+      "Rodzaj identyfikatora publicznego": "Projekt KPO",
+      "Identyfikator publiczny": "KPOD.03.15-IW.27-0107/25",
+      "Obszar tematyczny": "Gospodarka wodno-ściekowa",
+      "Rodzaj zamówienia": "Roboty budowlane",
+      "Reżim prawny": "Ustawa Pzp – zamówienie krajowe",
+      "Waluta rozliczeń": "PLN",
+      "Status przedsięwzięcia": "Zakończone",
+      "Źródło rekordu": "Rejestr publiczny",
+      "Data sporządzenia rekordu": "2026-11-20",
+      "Wersja rekordu": "2.0",
+      "Adnotacja instytucji": "KPO, inwestycja B3.1.1. Wartość przedsięwzięcia: 3 847 757,34 zł; dofinansowanie: 3 128 258,00 zł. Opis: „Projekt dotyczy budowy kanalizacji sanitarnej w miejscowości Baszków, obejmującej kanały KS2 i KS4. Głównym celem projektu jest zapewnienie sprawnego odprowadzania ścieków sanitarnych z obszaru objętego inwestycją do istniejącego systemu kanalizacyjnego. Projekt obejmuje: Budowę kanałów głównych KS2 i KS4. Wykonanie przykanalików – odcinków od kanału głównego do przyłączy do granic posesji, zlokalizowanych wzdłuż tras kanałów, zakończonych studniami przyłączeniowymi.”"
+    },
+    "validation": [
+      {
+        "level": "ok",
+        "field": "NIP",
+        "message": "NIP poprawny i zgodny z BZP („GMINA ZDUNY”)."
+      },
+      {
+        "level": "ok",
+        "field": "Identyfikator publiczny",
+        "message": "Format numeru KPO poprawny; kod regionu zgodny z województwem."
+      }
+    ],
+    "imported_at": "2026-11-22T00:37:02+01:00",
+    "enriched_at": "2026-11-22T01:02:20+01:00",
+    "summary": {
+      "gaps": [
+        {
+          "item": "Aneksy / ogłoszenia o zmianie umowy (Budowa kanalizacji sanitarnej w miejscowości Baszków Gmina Z)",
+          "why": "zmiany znane tylko z ogłoszenia o wykonaniu – pełne uzasadnienie bywa w aneksach",
+          "where": "BIP zamawiającego (rejestr umów), wniosek o informację publiczną",
+          "level": "info"
+        },
+        {
+          "item": "Podpisana umowa z załącznikami",
+          "why": "warunki kontraktowe (kary, zmiany, odbiory) – rzadko publikowana; można odtworzyć z PPU/SWU z oznaczeniem „warunki kontraktowe odtworzone; brak podpisanego egzemplarza umowy”",
+          "where": "BIP (rejestr umów), platforma zakupowa (PPU)",
+          "level": "info"
+        },
+        {
+          "item": "SWZ / PFU / OPZ",
+          "why": "źródło ryzyk na etapie przygotowania (zakres, wymagania, podział odpowiedzialności)",
+          "where": "platforma zakupowa: https://platformazakupowa.pl/transakcja/1240795",
+          "level": "info"
+        }
+      ],
+      "procedures": 1,
+      "contracts": 1,
+      "changes": 1,
+      "contract_value": 3665400.0,
+      "paid_value": 4194312.76,
+      "cost_change_pct": 14.43,
+      "delayed": 1,
+      "delay_days": 40,
+      "risk_codes": {
+        "R01": 1,
+        "R13": 1
+      },
+      "events": 2,
+      "pending_events": 2,
+      "uncertain_links": 1,
+      "status": "zakończone"
+    }
+  },
+  "links": [
+    {
+      "link_id": 243,
+      "project_id": "RM-2026-018",
+      "target_type": "document",
+      "target_id": "BIP-7c7d4ab4f7db9519",
+      "title": "zduny.pl - Urząd Miejski w Zdunach",
+      "source_system": "BIP",
+      "url": "https://bip.zduny.pl/miasto-gmina/budowa-kanalizacji-sanitarnej-w-miejscowosci-baszkow-gmina-zduny-etap-ii",
+      "match_basis": "słowa kluczowe inwestycji w treści",
+      "confidence": 0.9,
+      "evidence": [
+        "trafień słów kluczowych: 15",
+        "słowa: Baszków Gmina, kanalizac"
+      ],
+      "status": "uncertain",
+      "created_at": "2026-11-22T01:02:18+01:00",
+      "reviewed_at": null,
+      "reviewer": null
+    },
+    {
+      "link_id": 242,
+      "project_id": "RM-2026-018",
+      "target_type": "procedure",
+      "target_id": "ocds-148610-7e0ea9c9-6750-4265-9084-990373d449f5",
+      "title": "Budowa kanalizacji sanitarnej w miejscowości Baszków Gmina Zduny - etap II",
+      "source_system": "BZP",
+      "url": "https://ezamowienia.gov.pl/mp-client/search/list/ocds-148610-7e0ea9c9-6750-4265-9084-990373d449f5",
+      "match_basis": "NIP + podobieństwo nazwy",
+      "confidence": 0.84,
+      "evidence": [
+        "ten sam NIP zamawiającego (6211694095)",
+        "podobieństwo nazwy/opisu 62% (wspólne: baszko, etap, obejmu, projek, zduny)",
+        "rok postępowania 2025 zgodny z naborem KPO (2025)",
+        "wartość umowy 3 665 400 zł zgodna ze skalą projektu (3 847 757 zł)"
+      ],
+      "status": "auto",
+      "created_at": "2026-11-22T01:01:38+01:00",
+      "reviewed_at": null,
+      "reviewer": null
+    }
+  ],
+  "procedures": [
+    {
+      "tender_id": "ocds-148610-7e0ea9c9-6750-4265-9084-990373d449f5",
+      "source_system": "BZP",
+      "sector": "wod-kan",
+      "subsector": "kan_san",
+      "subsectors_extra": [],
+      "works_type": "budowa",
+      "design_build": 0,
+      "title": "Budowa kanalizacji sanitarnej w miejscowości Baszków Gmina Zduny - etap II",
+      "description": "Przedmiotem zamówienia jest realizacja robót budowlanych polegających na budowie kanalizacji sanitarnej w miejscowości Baszków, Gmina Zduny – etap II, zgodnie z dokumentacją projektową stanowiącą załącznik do Specyfikacji Warunków Zamówienia.\nZakres zamówienia obejmuje wykonanie wszelkich robót budowlanych oraz czynności niezbędnych do prawidłowej, kompletnej i zgodnej z przeznaczeniem realizacji inwestycji, w tym robót przygotowawczych, zasadniczych oraz odtworzeniowych.\nSzczegółowy zakres oraz sposób realizacji zamówienia określa dokumentacja projektowa oraz pozostałe postanowienia SWZ, które stanowią integralną część opisu przedmiotu zamówienia.\n2. Wskazane w dokumentach znaki towarowe, nazwy własne, itp. - stanowią wyłącznie wzorzec jakościowy, funkcjonalny, techniczny i technologiczny dotyczący przedmiotu zamówienia. We wszystkich przypadkach, w których ze względu na specyfikację przedmiotu zamówienia wskazano pochodzenie, nazwy materiałów, urządzeń, lub ich pochodzenie, dopuszcza się stosowanie materiałów, urządzeń równoważnych, tj. wszelkie wymienione z nazwy materiały, urządzenia użyte w przekazanej przez Zamawiającego dokumentacji lub ich pochodzenie, służą wyłącznie określeniu standardu i mogą być zastąpione innymi o nie gorszych parametrach technicznych, użytkowych, jakościowych, funkcjonalnych i walorach estetycznych, przy uwzględnieniu prawidłowej współpracy z pozostałymi materiałami, urządzeniami. Użyte w dokumentacji zamówienia nazwy, które wskazują lub mogłyby kojarzyć się z producentem lub firmą, nie mają na celu preferowanie rozwiązań danego producenta, lecz wskazanie na rozwiązanie, które powinno posiadać cechy techniczne, technologiczne nie gorsze od podanych w dokumentacji technicznej. Zamawiający w przypadku ofert zawierających rozwiązania równoważne będzie je weryfikować pod względem spełniania wymogów poszczególnych pozycji wymagań technicznych zawartych w załącznikach do Specyfikacji. Wykonawca zobowiązany jest udowodnić w ofercie równoważność oferowanych urządzeń lub systemów. Ciężar udowodnienia równoważności jest obowiązkiem Wykonawcy. Zamawiający nie uzna rozwiązań równoważnych, jeśli będą o gorszych niż wskazane w załącznikach do Specyfikacji minimalnych wymaganiach jakościowych, funkcjonalnych, technicznych i technologicznych.\n3. Zamieszczone w dokumentacji zamówienia wymienione nazwy producentów (jeśli takie się pojawią) użyto jedynie w celu przykładowym. Ewentualnie wskazane nazwy produktów oraz ich producentów nie mają na celu naruszenie zasady uczciwej konkurencji i równego traktowania wykonawców. Wszędzie, gdzie są one wskazane, należy czytać w ten sposób, że towarzyszy im określenie \"lub równoważne\". Przez pojęcie \"lub równoważne\" Zamawiający rozumie oferowanie materiałów gwarantujących realizację zadania zapewniających uzyskanie parametrów technicznych nie gorszych od założonych w wyżej wymienionych dokumentach. Zastosowanie rozwiązań równoważnych nie może prowadzić do pogorszenia właściwości przedmiotu zamówienia w stosunku do przewidzianych w dokumentacji technicznej, ani do zmiany ceny, ani do naruszenia przepisów prawa.\n4. Jednocześnie wymogi muszą być spełnione w zakresie:\na) gabarytów i konstrukcji (wielkość, rodzaj, właściwości fizyczne oraz liczba elementów składowych);\nb) charakteru użytkowego (tożsamość funkcji);\nc) parametrów technicznych (wytrzymałość, trwałość, dane techniczne, konstrukcje);\nd) parametrów bezpieczeństwa użytkowania;\ne) standardów emisyjnych.\n5. W przypadku spełnienia powyższych warunków Zamawiający dopuszcza stosowanie rozwiązań równoważnych. Jeżeli Wykonawca zaoferuje rozwiązania równoważne, musi wykazać w ofercie, że proponowany przez niego przedmiot zamówienia spełnia wymagania określone przez Zamawiającego.\n6. Ilekroć niniejsza specyfikacja opisuje przedmiot zamówienia za pomocą norm, ocen technicznych, specyfikacji technicznych i systemów referencji technicznych, Zamawiający dopuszcza rozwiązania równoważne opisywanym. Wykonawca, który powołuje się na rozwiązania równoważne opisywanym przez Zamawiającego, udowodni w ofercie, w szczególności za pomocą przedmiotowych środków dowodowych, o których mowa w art. 104-107 ustawy Pzp, że proponowane rozwiązania w równoważnym stopniu spełniają wymagania określone w opisie przedmiotu zamówienia.\n7. Wykonawca jest zobowiązany do sporządzenia i przedstawienia Zamawiającemu harmonogramu rzeczowo-finansowego w terminie nie dłuższym niż 3 dni od daty podpisania Umowy.\nHarmonogram należy przygotować w oparciu o elementy składowe wynikające z przedmiarów robót oraz dokumentacji projektowej.\n8. Zakres robót oraz kwoty wskazane w harmonogramie w odniesieniu do poszczególnych pozycji muszą być adekwatne do rzeczywiście ponoszonych kosztów.\nHarmonogram wymaga pisemnej, pod rygorem nieważności, akceptacji Zamawiającego. Zamawiającemu przysługuje prawo do zmian w harmonogramie, które są dla Wykonawcy wiążące. Harmonogram prac może zostać zmieniony w trakcie realizacji prac za pisemną zgodą Zamawiającego pod rygorem nieważności. Zmiana harmonogramu nie stanowi zmiany umowy i nie wymaga aneksu jeżeli nie wpływa na ostateczny termin realizacji umowy.\n9. Wykonawca wraz z ofertą zobowiązany jest złożyć \"uproszczony\" kosztorys ofertowy, sporządzony na podstawie przedmiaru robót i załączonej dokumentacji projektowej i technicznej.\nNiezłożenie wraz z ofertą ww. kosztorysu ofertowego spowoduje odrzucenie oferty na podstawie art. 226 ust. 1 pkt 5 ustawy Pzp ponieważ zgodnie z wyrokiem Krajowej Izby Odwoławczej z dnia 28 września 2021 r. [sygn. akt: KIO 2377/21] niezłożenie przez Wykonawcę wskazanego kosztorysu utrudnia Zamawiającemu prowadzenie negocjacji z Wykonawcą ponieważ pozbawia Zamawiającego możliwości analizy sposobu i prawidłowości kalkulacji ceny, jak również należytego przygotowania się do negocjacji.",
+      "org_key": "6211694095",
+      "org_name": "GMINA ZDUNY",
+      "nip": "6211694095",
+      "province": "PL30",
+      "city": "Zduny",
+      "cpv_main": "45231300-8 - Roboty budowlane w zakresie budowy wodociągów i rurociągów do odprowadzania ścieków",
+      "cpv_all": "45231300-8 (Roboty budowlane w zakresie budowy wodociągów i rurociągów do odprowadzania ścieków),45000000-7 (Roboty budowlane),45330000-9 (Roboty instalacyjne wodno-kanalizacyjne i sanitarne),45232423-3 (Roboty budowlane w zakresie przepompowni ścieków),45233140-2 (Roboty drogowe),45200000-9 (Roboty budowlane w zakresie wznoszenia kompletnych obiektów budowlanych lub ich części oraz roboty w zakresie inżynierii lądowej i wodnej),45232410-9 (Roboty w zakresie kanalizacji ściekowej)",
+      "estimated_value_net": 3673478.77,
+      "eu_funded": 0,
+      "tryb": "art. 275 pkt 2 ustawy",
+      "platform_url": "https://platformazakupowa.pl/transakcja/1240795",
+      "planned_days": 80,
+      "period_txt": "80 dni",
+      "changes_foreseen": 1,
+      "price_weight": 60.0,
+      "first_pub_date": "2025-12-23",
+      "last_pub_date": "2026-07-06",
+      "year": 2025,
+      "length_km": null,
+      "connections": null,
+      "features": [
+        "ciek"
+      ],
+      "n_notices": 3,
+      "n_contracts": 1,
+      "n_changes": 1,
+      "offers_avg": 7.0,
+      "cancelled_parts": 0,
+      "parts": 1,
+      "contract_value": 3665400.0,
+      "paid_value": 4194312.76,
+      "cost_change_pct": 14.43,
+      "actual_days": 120,
+      "delay_days": 40,
+      "delayed": 1,
+      "improper": 0,
+      "not_executed": 0,
+      "has_outcome": 1,
+      "status": "zakończone",
+      "risk_codes": [
+        "R01"
+      ],
+      "exemplary": 0,
+      "expert_note": null,
+      "updated_at": "2026-11-22T01:05:42+01:00",
+      "notices": [
+        {
+          "notice_number": "2025/BZP 00620692/01",
+          "notice_type": "ContractNotice",
+          "pub_date": "2025-12-23",
+          "title": "Budowa kanalizacji sanitarnej w miejscowości Baszków Gmina Zduny - etap II",
+          "url": "https://ezamowienia.gov.pl/mo-client-board/bzp/notice-details/id/08de4224-9854-9d7c-d6d3-f500016275eb",
+          "fetched_at": "2026-11-22T01:01:38+01:00",
+          "source_system": "BZP"
+        },
+        {
+          "notice_number": "2026/BZP 00194260/01",
+          "notice_type": "TenderResultNotice",
+          "pub_date": "2026-04-12",
+          "title": "Budowa kanalizacji sanitarnej w miejscowości Baszków Gmina Zduny - etap II",
+          "url": "https://ezamowienia.gov.pl/mo-client-board/bzp/notice-details/id/08de98d8-0f55-144f-5fad-950001197fcb",
+          "fetched_at": "2026-11-22T01:01:38+01:00",
+          "source_system": "BZP"
+        },
+        {
+          "notice_number": "2026/BZP 00324517/01",
+          "notice_type": "ContractPerformingNotice",
+          "pub_date": "2026-07-06",
+          "title": "Budowa kanalizacji sanitarnej w miejscowości Baszków Gmina Zduny - etap II",
+          "url": "https://ezamowienia.gov.pl/mo-client-board/bzp/notice-details/id/08dedb3f-426c-687a-2028-230001aee96a",
+          "fetched_at": "2026-11-22T01:01:38+01:00",
+          "source_system": "BZP"
+        }
+      ],
+      "contracts": [
+        {
+          "contract_id": "ocds-148610-7e0ea9c9-6750-4265-9084-990373d449f5#1#1",
+          "tender_id": "ocds-148610-7e0ea9c9-6750-4265-9084-990373d449f5",
+          "part": 1,
+          "contractor": "Przedsiębiorstwo Wielobranżowe TOR Marian Iberhan",
+          "contractor_nip": "6210006578",
+          "contract_date": "2026-02-17",
+          "period_txt": "80 dni",
+          "planned_days": 80,
+          "contract_value": 3665400.0,
+          "result_notice": "2026/BZP 00194260/01",
+          "perf_notice": "2026/BZP 00324517/01",
+          "offers": 7,
+          "min_price": 3264311.58,
+          "max_price": 4300080.0,
+          "estimated_value_net": 3673478.77,
+          "cancelled": 0,
+          "cancel_reason": null,
+          "executed": 1,
+          "completion_date": "2026-06-17",
+          "on_time": 0,
+          "properly": 1,
+          "changes_count": 1,
+          "paid_value": 4194312.76,
+          "cost_change_pct": 14.43,
+          "actual_days": 120,
+          "delay_days": 40,
+          "additional_info": ""
+        }
+      ],
+      "changes": [
+        {
+          "change_id": 66854,
+          "tender_id": "ocds-148610-7e0ea9c9-6750-4265-9084-990373d449f5",
+          "contract_id": "ocds-148610-7e0ea9c9-6750-4265-9084-990373d449f5#1#1",
+          "source_notice": "2026/BZP 00324517/01",
+          "source_type": "ContractPerformingNotice",
+          "section": "5.4.4",
+          "change_no": 1,
+          "change_date": null,
+          "legal_basis": "art. 455 ust. 2 ustawy",
+          "basis_label": "zmiana o niewielkiej wartości (limity ustawowe)",
+          "reason": "W toku realizacji umowy wystąpiła potrzeba rozszerzenia zakresu zamówienia , których wykonanie było niezbędne dla prawidłowej i kompletnej realizacji zamówienia. Zmiana nie powoduje zmiany ogólnego charakteru umowy, a jej wartość jest niższa od progów unijnych oraz nie przekracza 15% wartości pierwotnej umowy. W związku z rozszerzeniem zakresu robót odpowiednio przedłużono termin realizacji umowy. Zmiany dokonano na podstawie art. 455 ust. 2 ustawy Prawo zamówień publicznych.",
+          "description": "Po zmianie przedmiot zamówienia obejmował wykonanie łącznie 82 podłączeń, w tym 67 podłączeń przewidzianych w zakresie podstawowym oraz 15 dodatkowych podłączeń wykonanych w ramach rozszerzenia zakresu umowy.",
+          "value": 528912.76,
+          "price_increase": 1,
+          "effect_types": [
+            "termin",
+            "koszt",
+            "zakres"
+          ],
+          "time_ext_days": null,
+          "actions": [
+            "przedłużenie terminu (aneks)"
+          ]
+        }
+      ]
+    }
+  ],
+  "risk_events": [
+    {
+      "event_id": 162191,
+      "tender_id": null,
+      "project_id": "RM-2026-018",
+      "change_id": null,
+      "doc_id": "BIP-7c7d4ab4f7db9519",
+      "event_type": "fragment dokumentu wskazujący na ryzyko",
+      "risk_code": "R13",
+      "cause": "Roboty dodatkowe zostały sfinansowane w całości ze środków własnych Gminy Zduny i nie były objęte dofinansowaniem z Krajowego Planu Odbudowy i Zwiększania Odporności.",
+      "effect_types": [
+        "koszt",
+        "zakres"
+      ],
+      "effect_time_days": null,
+      "effect_cost_pln": null,
+      "effect_desc": null,
+      "actions": [],
+      "action_effectiveness": null,
+      "quote": "Roboty dodatkowe zostały sfinansowane w całości ze środków własnych Gminy Zduny i nie były objęte dofinansowaniem z Krajowego Planu Odbudowy i Zwiększania Odporności.",
+      "source_system": "BIP",
+      "source_ref": "zduny.pl - Urząd Miejski w Zdunach",
+      "source_url": "https://bip.zduny.pl/miasto-gmina/budowa-kanalizacji-sanitarnej-w-miejscowosci-baszkow-gmina-zduny-etap-ii",
+      "locator": "strona 1",
+      "matched_terms": [
+        "dofinansowani",
+        "srodkow wlasn"
+      ],
+      "confidence": 0.71,
+      "method": "reguła (katalog ekspercki) – dokument",
+      "status": "pending",
+      "reviewer": null,
+      "reviewed_at": null,
+      "expert_comment": null,
+      "exemplary": 0,
+      "created_at": "2026-11-22T01:06:56+01:00",
+      "risk_name": "Ryzyko finansowania, budżetu i płatności"
+    },
+    {
+      "event_id": 133193,
+      "tender_id": "ocds-148610-7e0ea9c9-6750-4265-9084-990373d449f5",
+      "project_id": null,
+      "change_id": 66854,
+      "doc_id": null,
+      "event_type": "zmiana terminu",
+      "risk_code": "R01",
+      "cause": "W toku realizacji umowy wystąpiła potrzeba rozszerzenia zakresu zamówienia , których wykonanie było niezbędne dla prawidłowej i kompletnej realizacji zamówienia. Zmiana nie powoduje zmiany ogólnego charakteru umowy, a jej wartość jest niższa od progów unijnych oraz nie przekracza 15% wartości pierwotnej umowy. W związku z rozszerzeniem zakresu robót odpowiednio przedłużono termin realizacji umowy. Zmiany dokonano na podstawie art. 455 ust. 2 ustawy Prawo zamówień publicznych.",
+      "effect_types": [
+        "termin",
+        "koszt",
+        "zakres"
+      ],
+      "effect_time_days": 40,
+      "effect_cost_pln": 528912.76,
+      "effect_desc": "Po zmianie przedmiot zamówienia obejmował wykonanie łącznie 82 podłączeń, w tym 67 podłączeń przewidzianych w zakresie podstawowym oraz 15 dodatkowych podłączeń wykonanych w ramach rozszerzenia zakresu umowy.",
+      "actions": [
+        "przedłużenie terminu (aneks)"
+      ],
+      "action_effectiveness": "częściowo skuteczne – umowę wykonano, ale po pierwotnym terminie",
+      "quote": "W toku realizacji umowy wystąpiła potrzeba rozszerzenia zakresu zamówienia , których wykonanie było niezbędne dla prawidłowej i kompletnej realizacji zamówienia. Zmiana nie powoduje zmiany ogólnego charakteru umowy, a jej wartość jest niższa od progów unijnych oraz nie przekracza 15% wartości pierwotnej umowy. W związku z rozszerzeniem zakresu robót odpowiednio przedłużono termin realizacji umowy. Zmiany dokonano na podstawie art. 455 ust. 2 ustawy Prawo zamówień publicznych. — Po zmianie przedmiot zamówienia obejmował wykonanie łącznie 82 podłączeń, w tym 67 podłączeń przewidzianych w zakresie podstawowym oraz 15 dodatkowych podłączeń wykonanych w ramach rozszerzenia zakresu umowy.",
+      "source_system": "BZP",
+      "source_ref": "2026/BZP 00324517/01",
+      "source_url": "https://ezamowienia.gov.pl/mo-client-board/bzp/notice-details/id/08dedb3f-426c-687a-2028-230001aee96a",
+      "locator": "sekcja 5.4.4 (ogłoszenie o wykonaniu umowy, 5.4)",
+      "matched_terms": [
+        "rozszerzenia zakres"
+      ],
+      "confidence": 0.62,
+      "method": "reguła (katalog ekspercki)",
+      "status": "pending",
+      "reviewer": null,
+      "reviewed_at": null,
+      "expert_comment": null,
+      "exemplary": 0,
+      "created_at": "2026-11-22T01:05:42+01:00",
+      "risk_name": "Niepełny lub niespójny zakres"
+    }
+  ],
+  "documents": [
+    {
+      "doc_id": "BIP-7c7d4ab4f7db9519",
+      "source_system": "BIP",
+      "doc_type": "strona",
+      "title": "zduny.pl - Urząd Miejski w Zdunach",
+      "url": "https://bip.zduny.pl/miasto-gmina/budowa-kanalizacji-sanitarnej-w-miejscowosci-baszkow-gmina-zduny-etap-ii",
+      "fetched_at": "2026-11-22T01:02:18+01:00",
+      "sha256": "7c7d4ab4f7db9519600c0f423cd2ba7ec74db1ed116a4e90082ccb9451036322",
+      "pages": 1,
+      "chars": 7910,
+      "status": "analyzed"
+    }
+  ],
+  "expert_history": []
+}

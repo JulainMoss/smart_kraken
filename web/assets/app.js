@@ -428,7 +428,7 @@ async function viewProjects(){
   ${list.map(p => { const s = p.summary || {};
     return `<tr class="click" data-pid="${esc(p.project_id)}"><td><code>${esc(p.project_id)}</code></td><td><b>${esc(p.title)}</b><br><small>${esc(SUB[p.subsector]||"")} ${p.programme?"· "+esc(p.programme):""}</small></td>
       <td>${esc(p.org_name)}<br><small>${esc(PROV[p.province]||"")}</small></td><td><small>${esc(p.public_id_type)}<br>${esc(p.public_id)}</small></td>
-      <td>${!p.enriched_at?tag("nie wzbogacono","grey"):s.procedures?`${s.procedures} postęp.${s.uncertain_links?" "+tag(s.uncertain_links+" niepewne","warn"):" "+tag("pewne","ok")}`:tag("brak w BZP","bad")}</td>
+      <td>${!p.enriched_at?tag("nie wzbogacono","grey"):s.procedures?`${s.procedures} postęp.${s.uncertain_links?" "+tag(s.uncertain_links+" niepewne","warn"):" "+tag("pewne","ok")}`:s.uncertain_links?tag("kandydat – do decyzji eksperta","warn"):tag("brak w BZP","bad")}</td>
       <td>${s.procedures?`${s.delayed?tag("po terminie","bad"):tag("w terminie","ok")}${s.cost_change_pct!=null?" "+sgn(s.cost_change_pct):""}<br><small>${s.changes||0} zmian umów</small>`:"—"}</td>
       <td>${s.events?`${s.events} <small>(${s.pending_events} do weryfikacji)</small>`:"—"}</td>
       <td>${p.validation_issues?tag(p.validation_issues+" uwag","warn"):tag("OK","ok")}</td></tr>`; }).join("")}

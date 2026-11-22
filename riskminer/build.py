@@ -173,6 +173,8 @@ def _aggregate_one(conn: sqlite3.Connection, tid: str, clf: Classifier) -> None:
         if desc:
             break
     org = next((n["d"].get("org") for n in reversed(notices) if n["d"].get("org")), {}) or {}
+    if not org and notices[0]["d"].get("buyer"):          # ogłoszenia TED
+        org = {"name": notices[0]["d"]["buyer"]}
     est = None
     for n in by["ContractNotice"] + by["TenderResultNotice"]:
         if n["d"].get("estimated_value_net"):

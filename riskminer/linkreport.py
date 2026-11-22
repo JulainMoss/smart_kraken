@@ -36,7 +36,7 @@ def link_report(conn: sqlite3.Connection) -> str:
             stats[cat] += 1
             ev = "; ".join(unj(l.get("evidence"), []))[:220]
             L.append(f"| {p['project_id']} | {p.get('public_id')} | {(l.get('title') or l['target_id'])[:70]} | {l['match_basis']} | {l['confidence']:.2f} | {cat} | {ev} |")
-    L.insert(3, "**Podsumowanie:** " + ", ".join(f"{k}: {v}" for k, v in stats.items()) + "\n")
+    L.insert(2, "**Podsumowanie:** " + ", ".join(f"{k}: {v}" for k, v in stats.items()) + "\n")
     val = rows(conn, "SELECT project_id, validation FROM projects")
     issues = [(v["project_id"], x) for v in val for x in (unj(v["validation"], []) or []) if x["level"] in ("error", "warning")]
     if issues:

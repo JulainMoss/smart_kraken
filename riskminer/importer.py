@@ -315,6 +315,17 @@ def link_project(conn: sqlite3.Connection, project_id: str, live: bool = True, p
         status = "auto" if (i == 0 and s >= 0.8 and s - second >= 0.08 and not links) else "uncertain"
         basis = "NIP + podobieństwo nazwy" if not links else "powiązane postępowanie (NIP + nazwa)"
         links.append({"target_id": c["tender_id"], "title": c.get("title"), "basis": basis, "confidence": round(s, 2), "evidence": ev, "status": status})
+    # wnioski z łączenia trafiają do walidacji rekordu (błędy/braki w danych wejściowych)
+    val = [v for v in (unj(p.get("validation"), []) or []) if v.get("field") != "Łączenie z BZP"]
+    if pub_norm and not any(l["basis"] == "numer ogłoszenia BZP" for l in links):
+        if any("odwołanie" in l["basis"] for l in links):
+            val.append({"level": "warning", "field": "Łączenie z BZP", "message": f"Ogłoszenie {pub_norm} nie występuje w BZP ani w API; postępowanie odnaleziono "
+                        f"przez odwołanie do tego numeru w innym ogłoszeniu – sprawdź numer w rekordzie."})
+        else:
+            val.append({"level": "error", "field": "Łączenie z BZP", "message": f"Ogłoszenie {pub_norm} nie występuje w BZP ani w API."})
+    if not any(l["status"] == "auto" for l in links):
+        val.append({"level": "warning", "field": "Łączenie z BZP", "message": "Brak pewnego dopasowania postępowania – powiązania wymagają decyzji eksperta."})
+    conn.execute("UPDATE projects SET validation=? WHERE project_id=?", (j(val), project_id))
     # zapis (nie nadpisujemy decyzji eksperta)
     for l in links:
         ex = one(conn, "SELECT status FROM project_links WHERE project_id=? AND target_type='procedure' AND target_id=?", (project_id, l["target_id"]))
@@ -358,7 +369,9 @@ def enrich_project(conn: sqlite3.Connection, project_id: str, live: bool = True,
             for n in notices:
                 title = ext.ted_title(n)
                 sim, rare = _title_sim(p["title"], title)
-                if sim < 0.35 or not rare:
+                org_st = {stem(t) for t in tokens(p.get("org_name") or "")} | {stem(t) for t in tokens(p.get("city") or "")}
+                rare = [w for w in rare if w not in org_st]      # sama nazwa zamawiającego nie wystarcza
+                if sim < 0.45 or not rare:
                     continue
                 pubno = n.get("publication-number")
                 _add_link(conn, project_id, "ted", pubno, title, "TED", f"https://ted.europa.eu/pl/notice/-/detail/{pubno}",
@@ -503,11 +516,15 @@ def analyze_document(conn: sqlite3.Connection, doc_id: str) -> int:
     clf = Classifier(conn)
     conn.execute("DELETE FROM risk_events WHERE doc_id=? AND status='pending'", (doc_id,))
     n = 0
-    seen = set()
+    # zdania już zapisane w innych dokumentach projektu (menu i stopki BIP powtarzają się na każdej stronie)
+    seen = {(r[0], fold(r[1] or "")[:80]) for r in conn.execute(
+        "SELECT risk_code, quote FROM risk_events WHERE project_id=? AND doc_id IS NOT NULL AND doc_id!=?", (d.get("project_id"), doc_id))} if d.get("project_id") else set()
     for pno, text in pages:
         for sent in split_sentences(text):
             if len(sent) > 700:
                 sent = sent[:700]
+            if _boilerplate(sent):
+                continue
             # w dokumentach wymagamy co najmniej dwóch niezależnych sygnałów (mniej fałszywych trafień)
             codes = [c for c in clf.classify_risk(sent, max_codes=1) if c["confidence"] >= 0.75 and c["status"] == "active"]
             if not codes:
@@ -528,6 +545,23 @@ def analyze_document(conn: sqlite3.Connection, doc_id: str) -> int:
     conn.execute("UPDATE documents SET status='analyzed' WHERE doc_id=?", (doc_id,))
     conn.commit()
     return n
+
+
+_BOILER = re.compile(r"pouczeni|zrzec|zrzeczeni|klauzul\w* informacyjn|\brodo\b|danych osobowych|inspektor\w* ochrony|przejdz do|deklaracj\w* dostepnosci|"
+                     r"mapa serwisu|polityk\w* prywatnosci|cookies|metryka|wersja do druku|liczba odslon")
+
+
+def _boilerplate(sent: str) -> bool:
+    """Menu, stopki i pouczenia BIP – nie są dowodem zdarzenia."""
+    f = fold(sent)
+    if _BOILER.search(f):
+        return True
+    words = re.findall(r"[^\W\d_]{3,}", sent)
+    if len(words) >= 12:
+        caps = sum(1 for w in words if w[0].isupper())
+        if caps / len(words) > 0.45:   # listy nazw (menu, nawigacja)
+            return True
+    return False
 
 
 def project_summary(conn: sqlite3.Connection, project_id: str) -> dict[str, Any]:

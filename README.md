@@ -19,8 +19,9 @@ python -m riskminer serve      # aplikacja: http://127.0.0.1:8000
 
 ![Raport dla nowej inwestycji](docs/img/raport.png)
 
-**Baza po przetworzeniu kopii BZP wod-kan 2021–2026:** 113 277 ogłoszeń → 45 069 postępowań (23 191 z wynikiem realizacji),
-39 211 umów, 28 631 zmian umów, 57 tys. zdarzeń ryzyka z dowodami, 5 126 zamawiających z danymi kontaktowymi.
+**Baza po przetworzeniu kopii BZP wod-kan 2021–2026 i źródeł dodatkowych:** 113 tys. ogłoszeń BZP + 500 TED + 58 orzeczeń KIO →
+45 912 postępowań w 6 sektorach (23 402 z wynikiem realizacji), 39 tys. umów, 28,6 tys. zmian umów, 58 tys. zdarzeń ryzyka z dowodami,
+5,1 tys. zamawiających z danymi kontaktowymi.
 Z 16 600 zakończonych umów wod-kan **35% wykonano po terminie** (średnio 88 dni), w **31% wypłacono więcej niż wartość umowy**,
 a 6 668 postępowań unieważniono, bo oferty przekroczyły budżet.
 
@@ -88,9 +89,9 @@ python -m riskminer test-run --project rekord_projektu.xlsx --investment opis_in
 
 ## 1. Problem, zakres i scenariusz użytkownika
 
-| Nowa analiza | Panel eksperta | Baza inwestycji |
-|---|---|---|
-| ![](docs/img/analiza.png) | ![](docs/img/ekspert.png) | ![](docs/img/baza.png) |
+| Nowa analiza | Projekty | Panel eksperta | Baza inwestycji |
+|---|---|---|---|
+| ![](docs/img/analiza.png) | ![](docs/img/projekty.png) | ![](docs/img/ekspert.png) | ![](docs/img/baza.png) |
 
 
 **Problem.** Wiedza o tym, co faktycznie działo się w zrealizowanych inwestycjach, jest rozproszona: ogłoszenia o zamówieniu,
@@ -146,6 +147,11 @@ Kolejność (wymóg „podstawową metodą powinno być dopasowanie po identyfik
    ważą więcej), zgodność roku z naborem KPO, skala wartości, podsektor. Wynik z **uzasadnieniem i pewnością**; niepewne → eksperta.
 4. **Walidacja identyfikatorów:** suma kontrolna NIP, format numeru BZP, **kod regionu w numerze KPO (IW.xx) vs województwo**,
    TERYT vs nazwa województwa, NIP z rekordu vs NIP w BZP.
+
+**Wynik na 22 projektach MFiPR:** 14 powiązanych po numerze ogłoszenia (pewność 1,0); 1 przez odwołanie – numer z rekordu
+(`2023/BZP 00110672/01`, Wolin) nie istnieje w BZP ani w API, ale jest przywołany w ogłoszeniu o wykonaniu umowy (błąd danych wykryty i opisany
+w walidacji); 6 projektów KPO po NIP + nazwie + roku naboru + skali; 1 projekt KPO (Kamionka) bez pewnego kandydata – przekazany ekspertowi.
+Dodatkowo 4 „powiązane postępowania” (np. powtórzone po unieważnieniu) czekają na decyzję eksperta.
 
 Raport z testu łączenia (poprawne / niepewne / błędne): `python -m riskminer link-report` → [`docs/raport_testu_laczenia.md`](docs/raport_testu_laczenia.md).
 
@@ -333,6 +339,7 @@ docs/                   architektura, raport z testu łączenia, przykładowe ek
 | SAOS (orzeczenia KIO) | dane publiczne, otwarte API |
 | BIP, NIK, dane.gov.pl (KPOŚK) | informacja publiczna / otwarte dane |
 | Python 3 (biblioteka standardowa, SQLite FTS5) | PSF / public domain |
+| Testy | `python -m unittest discover tests` (parser BZP, kwoty, okresy, NIP/KPO, klasyfikacja, ekstrakcja) |
 | Opcjonalnie: pypdf (BSD), poppler-utils (GPL, narzędzie zewnętrzne), LibreOffice (MPL), tesseract (Apache 2.0) | |
 | Opcjonalnie: model Bielik (SpeakLeash, Apache 2.0) przez Ollamę (MIT) lub API zgodne z OpenAI | wg dostawcy |
 
