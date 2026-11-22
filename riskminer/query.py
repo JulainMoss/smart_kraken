@@ -189,7 +189,7 @@ def _merge_llm(clf: Classifier, q: dict, text: str, put) -> None:
         q["warnings"].append(f"Model językowy niedostępny ({type(e).__name__}) – parametry odczytano regułami.")
         return
     q["llm"] = r
-    q["llm_info"] = {"model": llm.cfg().get("model"), "seconds": round(time.time() - t0, 1)}
+    q["llm_info"] = {"model": llm.cfg().get("model"), "seconds": round(time.time() - t0, 1), "where": llm.where()}
     q["method"] = "model językowy + reguły"
     conflicts = q.setdefault("conflicts", {})
     sub_names = {s["code"]: s["name"] for s in clf.subsectors}
@@ -248,6 +248,8 @@ def _merge_llm(clf: Classifier, q: dict, text: str, put) -> None:
                 conflicts[key] = f"model: {fmt(value)}"
             else:
                 P[key]["source"] = "model i reguły"
+                if verify_quote(quote, text):   # krótki, dokładny cytat modelu zamiast szerokiego okna reguły
+                    P[key]["quote"] = quote
             return
         if verify_quote(quote, text):
             put(key, value, quote, "model")

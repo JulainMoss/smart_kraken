@@ -189,7 +189,7 @@ function viewParams(q){
   <div class="page-title"><div><h1>Sprawdź parametry inwestycji</h1><p>Tak odczytaliśmy Twój opis. Popraw lub uzupełnij wartości – od nich zależy dobór podobnych inwestycji.</p></div></div>
   <div class="steps"><div class="step done"><span class="n">${ic("check")}</span>Opis inwestycji</div><div class="step active"><span class="n">2</span>Sprawdzenie parametrów</div><div class="step"><span class="n">3</span>Raport</div></div>
   ${(q.warnings||[]).map((w,i) => `<div class="flag ${q.vague && i===0 ? "red" : "amber"}">${ic(q.vague && i===0 ? "stop" : "alert")}<div>${esc(w)}</div></div>`).join("")}
-  ${li ? `<div class="notice model"><div class="model-box">${ic("cpu")}<div><b>Formularz wypełnił model językowy ${esc(li.model)}</b> (lokalnie, ${String(li.seconds).replace(".",",")} s).
+  ${li ? `<div class="notice model"><div class="model-box">${ic("cpu")}<div><b>Formularz wypełnił model językowy ${esc(li.model)}</b> (${esc(li.where || "lokalnie")}, ${String(li.seconds).replace(".",",")} s).
     Każda wartość ma cytat z opisu, sprawdzony przez system; liczby porównano z regułami.${q.summary_llm ? `<br>Streszczenie: ${esc(q.summary_llm)}` : ""}</div></div></div>` : ""}
   <div class="card">
     <div class="card-head"><h2>Parametry wyszukiwania</h2><span class="legend">Źródło wartości: ${tag("model","model")} ${tag("model i reguły – zgodne","ok")} ${tag("reguły","grey")}</span></div>

@@ -9,8 +9,9 @@ Jury przekazuje dwa pliki: **rekord dodatkowego projektu** (jak w `Risk_Miner_da
 
 ```bash
 cd smart_kraken
-scripts/start_llm.sh &                 # opcjonalnie: lokalny model językowy (odczyt opisu); bez niego działają reguły
-python -m riskminer serve              # http://127.0.0.1:8000 – sprawdź w nagłówku: liczba postępowań i stan modelu
+python -m riskminer serve              # http://127.0.0.1:8000 – sprawdź w nagłówku: liczba postępowań i zielona kropka modelu
+# model: Claude przez Claude Code (config.toml: provider = "claude-code") – wymaga zalogowanego `claude`;
+# alternatywa offline: scripts/start_llm.sh + provider = "openai". Bez modelu działają reguły eksperckie.
 ```
 
 **O 11:00 – w przeglądarce (zalecane):**
@@ -37,14 +38,15 @@ python -m riskminer test-run --project rekord.xlsx --investment opis.docx --out 
 
 | Objaw | Co zrobić |
 |---|---|
-| „Model … niedostępny” w nagłówku | Nic – opis odczytają reguły. Albo uruchom `scripts/start_llm.sh`. |
+| Czerwona kropka modelu w nagłówku | Nic – opis odczytają reguły. Sprawdź `claude --version` i logowanie (`claude`, `/login`). |
+| Wyczerpany limit subskrypcji Claude | Odczyt wróci do reguł automatycznie (komunikat przy formularzu); albo `provider = "none"`. |
 | Brak internetu | Odznacz „przeszukaj źródła zewnętrzne”; łączenie z lokalną bazą BZP działa offline. |
 | Projekt bez powiązania BZP | Raport rekordu pokazuje „brak”/„niepewne” z uzasadnieniem – to poprawny wynik; ekspert może zatwierdzić kandydata. |
 | Plik opisu to skan PDF | Odczyt przez OCR (tesseract), jeśli zainstalowany; inaczej wklej tekst w polu „albo wklej tekst opisu”. |
 
 ## Pokaz dla jury (ok. 5 min)
 
-1. **Nowa analiza → przykład „Opis potoczny, jak w mailu”** – urzędnik pisze jak w mailu; model językowy (lokalnie) wypełnia
+1. **Nowa analiza → przykład „Opis potoczny, jak w mailu”** – urzędnik pisze jak w mailu; model językowy (Claude) wypełnia
    formularz, przy każdej wartości widać cytat z opisu i źródło (model / reguły / zgodne). Rozbieżności są oznaczone.
 2. **Wygeneruj raport** – ryzyko opóźnienia z przedziałem 90% i N, rzeczywisty czas, zmiana kosztu, ocena budżetu na km,
    sygnały ostrzegawcze; zakładka **Problemy** – każdy wniosek ma cytat i numer ogłoszenia (klik → treść ogłoszenia z podświetleniem).

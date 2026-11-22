@@ -42,6 +42,8 @@ DEFAULTS: dict[str, Any] = {
         "temperature": 0.0,
         "timeout_s": 180,
         "data_location": "lokalnie (bez modelu językowego – dane nie opuszczają komputera)",
+        "effort": "",          # tylko claude-code: low / medium / high
+        "claude_bin": "",      # tylko claude-code: ścieżka do programu claude (domyślnie z PATH)
     },
     "expert": {"default_reviewer": "ekspert"},
 }

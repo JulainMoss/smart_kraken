@@ -89,12 +89,31 @@ python -m riskminer test-run --project rekord_projektu.xlsx --investment opis_in
 # wyniki_testu/AN-....md|.json|.csv        – analiza nowej inwestycji
 ```
 
-### Lokalny model językowy (opcjonalnie)
+### Model językowy (opcjonalnie)
 
 Model odczytuje opis inwestycji i wypełnia formularz parametrów (rodzaj inwestycji, robót, formuła, miejsce, budżet, termin,
 skala, elementy techniczne, frazy do wyszukiwania). **Każda wartość ma cytat z opisu, który system sprawdza w tekście**; liczby są
 porównywane z regułami (pierwszeństwo mają dokładne wyrażenia), a rozbieżności są pokazywane urzędnikowi przy polu formularza.
-Bez modelu wszystko działa na regułach eksperckich.
+Bez modelu wszystko działa na regułach eksperckich. Model pisze też krótkie podsumowanie raportu prostym językiem
+(oznaczone jako *Wniosek*, wyłącznie na liczbach z raportu).
+
+**Wariant A – Claude przez Claude Code (używany w pokazie; w ramach subskrypcji Claude, bez klucza API).** Aplikacja wywołuje
+`claude -p` w trybie nieinteraktywnym: bez narzędzi, bez zapisu sesji, bez plików projektu, z wynikiem walidowanym względem
+schematu JSON (`--json-schema`). Odczyt opisu: ok. 7–14 s (Claude Opus 5.5, effort `low`).
+
+```toml
+# config.toml
+[llm]
+provider = "claude-code"
+model = "claude-opus-5-5"      # albo "claude-haiku-5-5"
+effort = "low"
+data_location = "Claude (Anthropic) przez Claude Code – opis jest wysyłany do usługi Claude"
+```
+
+Warunek: zainstalowany i zalogowany Claude Code (`claude`, potem `/login`). To rozwiązanie do własnego użytku zespołu (pokaz, test);
+system produkcyjny dla wielu urzędników powinien korzystać z klucza API lub modelu lokalnego.
+
+**Wariant B – lokalny model (dane nie opuszczają komputera), bez internetu:**
 
 ```bash
 # llama.cpp (CPU, bez karty graficznej): https://github.com/ggml-org/llama.cpp/releases – plik ubuntu-x64 do ../llm_runtime/bin/
@@ -372,6 +391,7 @@ docs/                   architektura, raport z testu łączenia, przykładowe ek
 | Python 3 (biblioteka standardowa, SQLite FTS5) | PSF / public domain |
 | Testy | `python -m unittest discover tests` (parser BZP, kwoty, okresy, NIP/KPO, klasyfikacja, ekstrakcja) |
 | Opcjonalnie: pypdf (BSD), poppler-utils (GPL, narzędzie zewnętrzne), LibreOffice (MPL), tesseract (Apache 2.0) | |
+| Opcjonalnie: Claude (Anthropic) przez Claude Code – odczyt opisu i podsumowanie raportu (wariant użyty w pokazie) | warunki subskrypcji Claude / API Anthropic |
 | Opcjonalnie: llama.cpp (MIT) – lokalny serwer modelu | MIT |
 | Opcjonalnie: Bielik-1.5B-v3.0-Instruct / Bielik-11B (SpeakLeash) – polski model, zalecany do zastosowań w administracji | Apache 2.0 |
 | Opcjonalnie: Qwen2.5-3B-Instruct (Alibaba) – do prototypu; licencja badawcza (bez zastosowań komercyjnych); Qwen2.5-1.5B/7B – Apache 2.0 | Qwen Research / Apache 2.0 |

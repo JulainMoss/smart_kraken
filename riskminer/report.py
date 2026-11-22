@@ -238,8 +238,21 @@ def _auto_title(q: dict) -> str:
     m = re.search(r"(?:pn\.|pod nazwą|nazwie|zadanie|zadania|inwestycj\w*)\s*[:]?\s*[„\"]([^”\"]{12,160})[”\"]", txt)
     if m:
         return m.group(1).strip()
-    t = txt.strip().split("\n")[0]
-    return (t[:110] + "…") if len(t) > 110 else t or "Analiza nowej inwestycji"
+    t = txt.strip().split("\n")[0].strip()
+    casual = re.match(r"(?i)(dzień dobry|witam|szanown|cześć|proszę|chcemy|chcielibyśmy|planujemy|mamy|potrzebujemy)", t)
+    if t and len(t) <= 110 and not casual and not t.endswith("?"):
+        return t
+    # tytuł z rozpoznanych parametrów, np. „Budowa – kanalizacja sanitarna, ok. 5 km (Gmina Lipowo)”
+    P = {k: v.get("value") for k, v in q.get("params", {}).items()}
+    sub = (q.get("labels") or {}).get("subsector") or ""
+    wt = (P.get("works_type") or "").split("/")[0]
+    head = " – ".join(x for x in (wt.capitalize(), sub.lower()) if x) or "Inwestycja"
+    extra = ["ok. " + f"{P['length_km']:g}".replace(".", ",") + " km"] if P.get("length_km") else []
+    if P.get("budget"):
+        extra.append(fmt_pln(P["budget"]))
+    who = P.get("org") or P.get("city") or ""
+    title = head + (", " + ", ".join(extra) if extra else "") + (f" ({who})" if who else "")
+    return title if (sub or wt) else ((t[:110] + "…") if len(t) > 110 else t or "Analiza nowej inwestycji")
 
 
 def _cancellations(conn: sqlite3.Connection, q: dict, exclude: set[str] | None) -> dict[str, Any]:

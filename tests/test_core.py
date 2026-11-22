@@ -163,3 +163,20 @@ class TestQueryUnderstanding(unittest.TestCase):
         self.assertEqual(q["search_terms"][0], "kanalizacja sanitarna")
         self.assertEqual(q["llm_info"]["model"], "test-model")
         self.assertFalse(q["vague"])
+
+
+class TestClaudeCodeProvider(unittest.TestCase):
+    def test_structured_output(self):
+        import json
+        from types import SimpleNamespace
+        from unittest import mock
+        from riskminer import llm
+        fake = SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"is_error": False, "result": "{}", "structured_output": {"a": "b"}}))
+        with mock.patch.object(llm, "cfg", return_value={"provider": "claude-code", "model": "claude-opus-5-5", "effort": "low", "timeout_s": 30}), \
+                mock.patch.object(llm, "_claude_bin", return_value="/usr/bin/claude"), mock.patch("subprocess.run", return_value=fake) as run:
+            out = llm.chat_json("system", "tekst", {"type": "object"})
+        self.assertEqual(out, {"a": "b"})
+        cmd = run.call_args[0][0]
+        self.assertIn("--json-schema", cmd)
+        self.assertEqual(cmd[cmd.index("--tools") + 1], "")           # bez narzędzi
+        self.assertEqual(run.call_args.kwargs["input"], "tekst")     # opis przez stdin, nie w linii poleceń

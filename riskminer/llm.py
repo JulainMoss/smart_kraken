@@ -4,7 +4,8 @@ Wszystkie funkcje systemu działają BEZ modelu (reguły + statystyka). Model, j
   * lepszego zrozumienia opisu nowej inwestycji (ekstrakcja parametrów z cytatami),
   * streszczenia raportu prostym językiem (wyraźnie oznaczone jako „wniosek modelu”),
   * propozycji klasyfikacji ryzyka dla zdarzeń, których reguły nie rozpoznały.
-Obsługiwane: Ollama (lokalnie, np. Bielik) oraz dowolne API zgodne z OpenAI (OpenAI, Mistral, OpenRouter, Groq, vLLM, llama.cpp).
+Obsługiwane: Ollama (lokalnie, np. Bielik), dowolne API zgodne z OpenAI (llama.cpp, vLLM, Mistral, OpenRouter…)
+oraz Claude przez Claude Code w trybie nieinteraktywnym (`claude -p`) – w ramach subskrypcji Claude, bez klucza API.
 """
 
 from __future__ import annotations
@@ -12,6 +13,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
+import subprocess
+import tempfile
 import urllib.error
 import urllib.request
 from typing import Any
@@ -35,12 +39,60 @@ def _http(url: str, payload: dict | None, timeout: float, headers: dict | None =
         return json.loads(r.read().decode("utf-8"))
 
 
+def _claude_bin() -> str | None:
+    return cfg().get("claude_bin") or shutil.which("claude")
+
+
+def _claude_code(system: str, user: str, schema: dict | None) -> str:
+    """Claude przez Claude Code (`claude -p`): bez narzędzi, bez sesji, bez ustawień projektu; wynik zgodny ze schematem JSON."""
+    exe = _claude_bin()
+    if not exe:
+        raise RuntimeError("Nie znaleziono programu 'claude' (Claude Code).")
+    c = cfg()
+    cmd = [exe, "-p", "Przetwórz dane wejściowe zgodnie z instrukcją systemową.", "--output-format", "json",
+           "--system-prompt", system, "--tools", "", "--no-session-persistence", "--strict-mcp-config", "--setting-sources", ""]
+    if c.get("model"):
+        cmd += ["--model", c["model"]]
+    if c.get("effort"):
+        cmd += ["--effort", c["effort"]]
+    if schema:
+        cmd += ["--json-schema", json.dumps(schema, ensure_ascii=False)]
+    # katalog tymczasowy: żadne pliki projektu (CLAUDE.md itp.) nie trafiają do kontekstu modelu
+    r = subprocess.run(cmd, input=user, capture_output=True, text=True, timeout=c.get("timeout_s", 180), cwd=tempfile.gettempdir())
+    try:
+        out = json.loads(r.stdout or "{}")
+    except json.JSONDecodeError:
+        raise RuntimeError(f"Claude Code: nieoczekiwana odpowiedź ({(r.stderr or r.stdout)[:200]})")
+    if out.get("is_error") or r.returncode != 0:
+        raise RuntimeError(f"Claude Code: {out.get('result') or out.get('subtype') or r.stderr[:200]}")
+    if schema and isinstance(out.get("structured_output"), dict):
+        return json.dumps(out["structured_output"], ensure_ascii=False)
+    return out.get("result") or ""
+
+
+def where() -> str:
+    """Krótki opis miejsca przetwarzania do komunikatów w interfejsie."""
+    c = cfg()
+    if c.get("provider") == "claude-code":
+        return "usługa Claude (Anthropic)"
+    host = re.sub(r"^https?://", "", c.get("base_url") or "").split("/")[0].split(":")[0]
+    return "lokalnie" if host in ("127.0.0.1", "localhost", "0.0.0.0", "") else f"serwer {host}"
+
+
 def status() -> dict[str, Any]:
     c = cfg()
     out = {"provider": c.get("provider"), "model": c.get("model"), "url": c.get("base_url"), "online": False,
            "data_location": c.get("data_location"), "enabled": enabled()}
     if not enabled():
         out["info"] = "Model językowy wyłączony – analiza oparta na regułach eksperckich i statystyce (działa offline)."
+        return out
+    if c["provider"] == "claude-code":
+        exe = _claude_bin()
+        out["online"] = bool(exe)
+        out["model"] = c.get("model") or "domyślny model Claude Code"
+        out["url"] = "Claude Code (subskrypcja Claude)"
+        if not exe:
+            out["error"] = "Nie znaleziono programu 'claude' – zainstaluj Claude Code i zaloguj się (claude, potem /login)."
         return out
     try:
         base = c["base_url"].rstrip("/")
@@ -62,6 +114,8 @@ def _auth() -> dict:
 
 def chat(system: str, user: str, schema: dict | None = None, max_tokens: int = 1500) -> str:
     c = cfg()
+    if c["provider"] == "claude-code":
+        return _claude_code(system, user, schema)
     base = c["base_url"].rstrip("/")
     msgs = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     if c["provider"] == "ollama":
@@ -110,7 +164,7 @@ PROVINCE_LABELS = ["dolnośląskie", "kujawsko-pomorskie", "lubelskie", "lubuski
 def _f(value_schema: dict | None = None) -> dict:
     """Pole = wartość + dosłowny cytat (serwer sprawdza, czy cytat jest w tekście)."""
     return {"type": "object", "properties": {"wartosc": value_schema or {"type": "string"}, "cytat": {"type": "string"}},
-            "required": ["wartosc", "cytat"]}
+            "required": ["wartosc", "cytat"], "additionalProperties": False}
 
 
 def query_schema(feature_labels: list[str]) -> dict:
@@ -126,10 +180,10 @@ def query_schema(feature_labels: list[str]) -> dict:
             "miejscowosc": _f(),
             "wojewodztwo": _f({"type": "string", "enum": PROVINCE_LABELS}),
             "kwota": {"type": "object", "properties": {"tekst": {"type": "string"}, "vat": {"type": "string", "enum": ["netto", "brutto", "nieokreślone"]},
-                                                     "cytat": {"type": "string"}}, "required": ["tekst", "vat", "cytat"]},
+                                                     "cytat": {"type": "string"}}, "required": ["tekst", "vat", "cytat"], "additionalProperties": False},
             "czas_realizacji": {"type": "object", "properties": {"liczba": {"type": "string"},
                                                                "jednostka": {"type": "string", "enum": ["dni", "tygodnie", "miesiące", "lata", ""]},
-                                                               "cytat": {"type": "string"}}, "required": ["liczba", "jednostka", "cytat"]},
+                                                               "cytat": {"type": "string"}}, "required": ["liczba", "jednostka", "cytat"], "additionalProperties": False},
             "dlugosc_sieci_km": _f(),
             "liczba_przylaczy": _f(),
             "elementy": {"type": "array", "maxItems": 10, "items": {"type": "string", "enum": feature_labels}},
@@ -138,6 +192,7 @@ def query_schema(feature_labels: list[str]) -> dict:
         },
         "required": ["czy_konkretna_inwestycja", "rodzaj_inwestycji", "rodzaj_robot", "zaprojektuj_i_wybuduj", "zamawiajacy", "miejscowosc",
                      "wojewodztwo", "kwota", "czas_realizacji", "dlugosc_sieci_km", "liczba_przylaczy", "elementy", "slowa_kluczowe", "streszczenie"],
+        "additionalProperties": False,
     }
 
 
