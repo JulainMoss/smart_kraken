@@ -129,6 +129,15 @@ def import_table(conn: sqlite3.Connection, filename: str, data: bytes, progress:
         rec["subsector"] = sub
         rec["validation"] = j(validate_project(conn, rec))
         cols = list(rec.keys())
+        old = one(conn, "SELECT title, org_id FROM projects WHERE project_id=?", (pid,))
+        if old and (fold(old["title"] or "") != fold(title) or digits(old["org_id"] or "") != digits(rec["org_id"] or "")):
+            # pod tym samym identyfikatorem przyszedł INNY projekt (inna nazwa lub NIP): powiązania, dokumenty i zdarzenia
+            # poprzedniego rekordu nie mogą przejść na nowy – odpinamy je (dane źródłowe zostają w bazie)
+            conn.execute("DELETE FROM project_links WHERE project_id=?", (pid,))
+            conn.execute("UPDATE documents SET project_id=NULL WHERE project_id=?", (pid,))
+            conn.execute("UPDATE risk_events SET project_id=NULL WHERE project_id=?", (pid,))
+            if progress:
+                progress(f"Uwaga: identyfikator {pid} był użyty dla innego projektu („{(old['title'] or '')[:60]}”) – poprzednie powiązania odpięto.")
         conn.execute(f"INSERT INTO projects ({','.join(cols)}) VALUES ({','.join('?' * len(cols))}) "
                      f"ON CONFLICT(project_id) DO UPDATE SET {','.join(f'{c}=excluded.{c}' for c in cols if c != 'project_id')}",
                      [rec[c] for c in cols])
@@ -326,7 +335,10 @@ def link_project(conn: sqlite3.Connection, project_id: str, live: bool = True, p
     if not any(l["status"] == "auto" for l in links):
         val.append({"level": "warning", "field": "Łączenie z BZP", "message": "Brak pewnego dopasowania postępowania – powiązania wymagają decyzji eksperta."})
     conn.execute("UPDATE projects SET validation=? WHERE project_id=?", (j(val), project_id))
-    # zapis (nie nadpisujemy decyzji eksperta)
+    # zapis (nie nadpisujemy decyzji eksperta); propozycje automatyczne z poprzedniego przebiegu, których już nie ma – usuwamy
+    keep = [l["target_id"] for l in links]
+    conn.execute(f"DELETE FROM project_links WHERE project_id=? AND target_type='procedure' AND status IN ('auto','uncertain') "
+                 f"AND target_id NOT IN ({','.join('?' * len(keep)) or "''"})", [project_id] + keep)
     for l in links:
         ex = one(conn, "SELECT status FROM project_links WHERE project_id=? AND target_type='procedure' AND target_id=?", (project_id, l["target_id"]))
         if ex and ex["status"] in ("approved", "rejected"):
