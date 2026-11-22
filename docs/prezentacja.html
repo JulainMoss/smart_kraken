@@ -60,9 +60,9 @@ th{color:#5d6876;font-size:15px;text-transform:uppercase}
 <section class="s"><div class="bar"></div><h2>Rozwiązanie: 3 kroki dla urzędnika</h2>
 <div class="grid g2"><div>
 <div class="step"><i>1</i><div><p style="margin:0"><b>Opis inwestycji</b> – wklejony tekst albo wstępne dokumenty (DOCX, PDF).</p></div></div>
-<div class="step"><i>2</i><div><p style="margin:0"><b>Sprawdzenie parametrów</b> – podsektor, skala, budżet, termin, elementy techniczne; każdy z cytatem z opisu.</p></div></div>
+<div class="step"><i>2</i><div><p style="margin:0"><b>Sprawdzenie parametrów</b> – podsektor, budżet, termin od podpisania umowy, <b>zakres w liczbach</b> (km, przyłącza); każdy z cytatem z opisu.</p></div></div>
 <div class="step"><i>3</i><div><p style="margin:0"><b>Raport</b> – ryzyko opóźnienia, realny czas i koszt, ocena budżetu (zł/km), czerwone flagi, problemy z dowodami, rekomendacje, zapisy umowne, <b>kontakty</b> do gmin, które to robiły.</p></div></div>
-<div class="box">Działa bez modelu językowego i bez internetu. Model – opcjonalnie: Claude wypełnia formularz z opisu (każda wartość z cytatem sprawdzanym w tekście) i streszcza raport; offline – lokalny Bielik / Qwen.</div>
+<div class="box">Działa bez modelu językowego i bez internetu. Model (opcjonalnie: Claude → lokalny Bielik) wypełnia formularz; system sprawdza każdą odpowiedź w tekście i dopisuje ilości pominięte przez model.</div>
 </div><div><img src="img/analiza.png" style="max-height:470px"></div></div>
 <span class="n">3</span></section>
 
@@ -73,7 +73,7 @@ th{color:#5d6876;font-size:15px;text-transform:uppercase}
 <tr><td><b>API BZP na żywo</b></td><td>brakujące ogłoszenia, monitoring trwających inwestycji</td></tr>
 <tr><td><b>TED · KIO (SAOS) · NIK</b></td><td>zamówienia unijne, odwołania, kontrole</td></tr>
 <tr><td><b>BIP gmin</b></td><td>robot szukający dokumentów inwestycji (umowy, aneksy, uchwały)</td></tr>
-<tr><td><b>Pliki</b></td><td>XLSX/XLS/CSV, PDF, DOCX, DOC, ODT, HTML (+ OCR)</td></tr></table></div>
+<tr><td><b>Pliki</b></td><td>XLSX/XLS/CSV, PDF, DOCX, HTML (+ OCR); DOC/ODT/RTF z LibreOffice</td></tr></table></div>
 <div><ul><li>Parser formularzy BZP rozpoznaje pola po etykietach – działa dla wszystkich wersji formularzy i sektorów.</li>
 <li>Każdy rekord: źródło, link, data pobrania, SHA-256, sekcja formularza / strona dokumentu.</li>
 <li>Proces powtarzalny: <code>python -m riskminer build</code>, „Wzbogać ponownie”, „Ponowna analiza”.</li>
@@ -124,9 +124,9 @@ th{color:#5d6876;font-size:15px;text-transform:uppercase}
 
 <section class="s"><div class="bar"></div><h2>Architektura i wdrożenie</h2>
 <div class="grid g3">
-<div class="m"><b style="font-size:28px">0 zależności</b><span>biblioteka standardowa Pythona, SQLite + FTS5, strona bez frameworków; Docker; jeden proces</span></div>
-<div class="m"><b style="font-size:28px">Model wymienny</b><span>none / Claude (Claude Code) / llama.cpp lub Ollama (Bielik – lokalnie) / API zgodne z OpenAI; zmiana w config.toml</span></div>
-<div class="m"><b style="font-size:28px">1–2 s</b><span>analiza nowej inwestycji na 45 tys. postępowań; eksport JSON / CSV / Markdown / PDF</span></div></div>
+<div class="m"><b style="font-size:28px">0 zależności</b><span>biblioteka standardowa Pythona, SQLite + FTS5, strona bez frameworków; docker compose: Risk Miner + Ollama z Bielikiem</span></div>
+<div class="m"><b style="font-size:28px">Model wymienny</b><span>none / Claude (Claude Code) / Ollama lub llama.cpp (Bielik – lokalnie) / API zgodne z OpenAI; łańcuch zapasowy Claude → Bielik → reguły</span></div>
+<div class="m"><b style="font-size:28px">1–2 s</b><span>analiza na 45 tys. postępowań (reguły; z lokalnym modelem na CPU – kilkadziesiąt s); eksport JSON / CSV / Markdown, druk do PDF</span></div></div>
 <ul style="margin-top:28px"><li>Model danych: projekty, postępowania, ogłoszenia, umowy, zmiany, zdarzenia, dokumenty, źródła, historia decyzji.</li>
 <li>Baza i analizy lokalnie, model wg konfiguracji (lokalny lub Claude); tylko publiczne dane instytucji; rejestr operacji; licencja MIT.</li>
 <li>Skalowanie: reguły, sektory i wagi w bazie; SQLite → PostgreSQL bez zmiany modelu.</li></ul>
