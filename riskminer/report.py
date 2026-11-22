@@ -62,6 +62,14 @@ def analyze(conn: sqlite3.Connection, q: dict[str, Any], title: str | None = Non
             exclude_tenders: set[str] | None = None) -> dict[str, Any]:
     P = {k: v.get("value") for k, v in q["params"].items()}
     found = search(conn, q, exclude_tenders=exclude_tenders)
+    # projekt z rekordu i jego własne postępowanie BZP to ta sama inwestycja – zostaje przypadek projektu
+    proj_ids = [r["tender_id"] for r in found if r["tender_id"].startswith("PROJ-")]
+    if proj_ids:
+        linked = {lt for (lt,) in conn.execute(
+            "SELECT l.target_id FROM project_links l JOIN projects pr ON pr.project_id=l.project_id "
+            f"WHERE ('PROJ-' || replace(pr.project_id,' ','_')) IN ({','.join('?' * len(proj_ids))}) "
+            "AND l.target_type='procedure' AND l.status IN ('auto','approved')", proj_ids)}
+        found = [r for r in found if r["tender_id"].startswith("PROJ-") or r["tender_id"] not in linked]
     min_n = setting(conn, "search.min_sample_warning", 8)
     # grupa porównawcza: wyniki wystarczająco bliskie najlepszemu
     group = []
@@ -73,12 +81,23 @@ def analyze(conn: sqlite3.Connection, q: dict[str, Any], title: str | None = Non
     tids = [r["tender_id"] for r in group]
     procs = [r["proc"] for r in group]
     n = len(procs)
+    # projekty z rekordów: zdarzenia ich powiązanych postępowań liczą się jako zdarzenia projektu
+    proj_map: dict[str, str] = {}
+    for t in tids:
+        if t.startswith("PROJ-"):
+            for (lt,) in conn.execute("SELECT l.target_id FROM project_links l JOIN projects pr ON pr.project_id=l.project_id "
+                                      "WHERE ('PROJ-' || replace(pr.project_id,' ','_'))=? AND l.target_type='procedure' AND l.status IN ('auto','approved')", (t,)):
+                proj_map[lt] = t
 
     # ---------------- zdarzenia ryzyka grupy
     ev = []
     if tids:
+        qt = tids + list(proj_map)
         ev = rows(conn, "SELECT e.*, p.title AS case_title, p.org_name AS case_org FROM risk_events e JOIN procedures p ON p.tender_id=e.tender_id "
-                        f"WHERE e.tender_id IN ({','.join('?' * len(tids))}) AND e.status!='rejected'", tids)
+                        f"WHERE e.tender_id IN ({','.join('?' * len(qt))}) AND e.status!='rejected'", qt)
+        for e in ev:
+            if e["tender_id"] in proj_map:
+                e["tender_id"] = proj_map[e["tender_id"]]
     cat = {r["code"]: r for r in rows(conn, "SELECT * FROM risk_catalog")}
     # ---------------- prognozy: czas
     delayed_flags = [p["delayed"] for p in procs if p.get("delayed") is not None]

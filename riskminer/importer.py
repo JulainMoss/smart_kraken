@@ -143,6 +143,7 @@ def import_table(conn: sqlite3.Connection, filename: str, data: bytes, progress:
                      [rec[c] for c in cols])
         imported.append(pid)
         n_rec = record_events(conn, pid)
+        project_case(conn, pid)
         if progress:
             progress(f"Wczytano projekt {pid}: {title[:60]}" + (f" – w treści rekordu rozpoznano {n_rec} zdarzeń ryzyka" if n_rec else ""))
     log_source(conn, "PLIK", f"import tabeli projektów ({len(imported)} rekordów)", filename, 200, len(imported),
@@ -273,7 +274,7 @@ def link_project(conn: sqlite3.Connection, project_id: str, live: bool = True, p
                           "basis": "numer ogłoszenia BZP (odwołanie w innym ogłoszeniu)" if via_ref else "numer ogłoszenia BZP", "confidence": conf,
                           "evidence": ev, "status": status})
     # 2) NIP + podobieństwo (projekty KPO, brak numeru, lub dodatkowe postępowania tego samego projektu)
-    cands = rows(conn, "SELECT * FROM procedures WHERE nip=?", (nip,)) if nip else []
+    cands = rows(conn, "SELECT * FROM procedures WHERE nip=? AND tender_id NOT LIKE 'PROJ-%'", (nip,)) if nip else []
     if live and nip and (not links or not cands or not pub_norm):
         try:
             say(f"Pobieram ogłoszenia zamawiającego „{p['org_name']}” z API BZP…")
@@ -281,7 +282,7 @@ def link_project(conn: sqlite3.Connection, project_id: str, live: bool = True, p
             recs = [x for x in bzp_api.fetch_org(short) if digits(x.get("organizationNationalId")) in (nip, "")]
             if recs:
                 bzp_api.ingest_live(conn, recs, f"zamawiający {short}")
-                cands = rows(conn, "SELECT * FROM procedures WHERE nip=?", (nip,))
+                cands = rows(conn, "SELECT * FROM procedures WHERE nip=? AND tender_id NOT LIKE 'PROJ-%'", (nip,))
         except Exception as e:
             say(f"API BZP niedostępne: {e}")
     linked = {l["target_id"] for l in links}
@@ -337,6 +338,8 @@ def link_project(conn: sqlite3.Connection, project_id: str, live: bool = True, p
         val.append({"level": "warning", "field": "Łączenie z BZP", "message": "Brak pewnego dopasowania postępowania – powiązania wymagają decyzji eksperta."})
     conn.execute("UPDATE projects SET validation=? WHERE project_id=?", (j(val), project_id))
     # zapis (nie nadpisujemy decyzji eksperta); propozycje automatyczne z poprzedniego przebiegu, których już nie ma – usuwamy
+    links = [l for l in links if not str(l["target_id"]).startswith("PROJ-")]
+    conn.execute("DELETE FROM project_links WHERE project_id=? AND target_type='procedure' AND target_id LIKE 'PROJ-%'", (project_id,))
     keep = [l["target_id"] for l in links]
     conn.execute(f"DELETE FROM project_links WHERE project_id=? AND target_type='procedure' AND status IN ('auto','uncertain') "
                  f"AND target_id NOT IN ({','.join('?' * len(keep)) or "''"})", [project_id] + keep)
@@ -453,6 +456,7 @@ def enrich_project(conn: sqlite3.Connection, project_id: str, live: bool = True,
     say("Gotowe.")
     from .expert_policy import auto_approve
     results["auto_approved"] = auto_approve(conn)
+    project_case(conn, project_id)   # przypadek projektu z aktualnymi powiązaniami i wynikiem realizacji
     if results["auto_approved"]:
         say(f"Polityka eksperta: zatwierdzono {results['auto_approved']} zdarzeń o wysokim prawdopodobieństwie.")
     return results
@@ -519,6 +523,66 @@ def import_document(conn: sqlite3.Connection, filename: str, data: bytes, projec
 EVENT_SIGNAL = (r"aneks|przedluz|wydluz|opozni|zmian\w* (umowy|terminu|zakresu|wynagrodz)|kolizj|robot\w* (dodatkow|zamienn|nieprzewidz)|"
                 r"uniewazni|odstapi|rozwiaz\w* umow|kar\w* umown|\bspor(?!t)|\bsad(?!z)|\bkio\b|odwola|niewykona|nienalezyt|wzrost\w* (koszt|cen|wartosc)|"
                 r"zwieksz\w* (wynagrodz|wartosc|koszt)|przekrocz|wstrzyma|problem|trudnos|awari|upadlos|zejscie wykonawcy|nie (uzyskano|zawarto)|brak\w* (zgod|decyzj|pozwol)")
+
+
+def project_case_id(project_id: str) -> str:
+    return "PROJ-" + re.sub(r"[^A-Za-z0-9._-]", "_", project_id)
+
+
+def project_case(conn: sqlite3.Connection, project_id: str) -> str | None:
+    """Projekt z rekordu jako przypadek w bazie doświadczeń (wyszukiwany jak postępowania): treść rekordu, cechy,
+    wynik realizacji z powiązanego postępowania BZP albo z treści rekordu (np. „przedłużono termin o 120 dni”)
+    oraz zdarzenia ryzyka z rekordu i z powiązanych postępowań. Dzięki temu nowo zaimportowany projekt od razu
+    trafia do grupy porównawczej podobnych inwestycji."""
+    from .build import stem_string
+    from .classify import extract_connections, extract_length_km
+    p = one(conn, "SELECT * FROM projects WHERE project_id=?", (project_id,))
+    if not p:
+        return None
+    cid = project_case_id(project_id)
+    clf = Classifier(conn)
+    ann = parse_annotation(p.get("annotation"))
+    desc = " ".join(x for x in (ann.get("description"), p.get("scope"), p.get("annotation")) if x)
+    text = (p.get("title") or "") + ". " + desc
+    sub, extra = clf.classify_subsector(p.get("title") or "", desc)
+    from .query import sector_from_text
+    sector = "wod-kan" if sub else (sector_from_text(text, sub)[0] or "inne")
+    links = rows(conn, "SELECT target_id FROM project_links WHERE project_id=? AND target_type='procedure' AND status IN ('auto','approved')", (project_id,))
+    linked = [one(conn, "SELECT * FROM procedures WHERE tender_id=?", (l["target_id"],)) for l in links]
+    linked = [x for x in linked if x]
+    best = max(linked, key=lambda x: (x.get("has_outcome") or 0, x.get("contract_value") or 0), default={})
+    rec_ev = rows(conn, "SELECT risk_code, effect_time_days FROM risk_events WHERE doc_id=? AND status!='rejected'", ("REC-" + re.sub(r"[^A-Za-z0-9._-]", "_", project_id),))
+    codes = set(unj(best.get("risk_codes"), []) or []) | {e["risk_code"] for e in rec_ev}
+    rec_delay = max((e["effect_time_days"] or 0 for e in rec_ev), default=0) or None
+    delayed = best.get("delayed")
+    delay_days = best.get("delay_days")
+    if rec_delay and not delay_days:
+        delayed, delay_days = 1, rec_delay
+    year = int(p["record_date"][:4]) if (p.get("record_date") or "")[:4].isdigit() else None
+    vals = {
+        "tender_id": cid, "source_system": "REKORD", "sector": sector, "subsector": sub, "subsectors_extra": j(extra),
+        "works_type": clf.works_type(p.get("title") or "") or clf.works_type(desc), "design_build": 1 if clf.design_build(text) else 0,
+        "title": p.get("title"), "description": desc[:4000], "org_key": p.get("org_id"), "org_name": p.get("org_name"), "nip": p.get("org_id"),
+        "province": p.get("province"), "city": p.get("city"), "estimated_value_net": p.get("project_value"),
+        "planned_days": best.get("planned_days"), "year": year or best.get("year"), "length_km": extract_length_km(text) or best.get("length_km"),
+        "connections": extract_connections(text) or best.get("connections"), "features": j(clf.features_of(text)),
+        "n_notices": best.get("n_notices"), "n_contracts": best.get("n_contracts"), "n_changes": best.get("n_changes"),
+        "contract_value": best.get("contract_value"), "paid_value": best.get("paid_value"), "cost_change_pct": best.get("cost_change_pct"),
+        "actual_days": best.get("actual_days"), "delay_days": delay_days, "delayed": delayed, "has_outcome": 1,
+        "status": "projekt z rekordu" + (" (powiązany z BZP)" if best else ""), "risk_codes": j(sorted(codes)), "updated_at": now_iso(),
+    }
+    cols = list(vals)
+    conn.execute(f"INSERT INTO procedures ({','.join(cols)}) VALUES ({','.join('?' * len(cols))}) ON CONFLICT(tender_id) DO UPDATE SET "
+                 + ",".join(f"{c}=excluded.{c}" for c in cols if c != "tender_id"), [vals[c] for c in cols])
+    conn.execute("UPDATE risk_events SET tender_id=? WHERE doc_id=?", (cid, "REC-" + re.sub(r"[^A-Za-z0-9._-]", "_", project_id)))
+    old = conn.execute("SELECT fts_rowid FROM fts_map WHERE tender_id=?", (cid,)).fetchone()
+    if old:
+        conn.execute("DELETE FROM procedures_fts WHERE rowid=?", (old[0],))
+    cur = conn.execute("INSERT INTO procedures_fts (tender_id,title_s,desc_s,changes_s) VALUES (?,?,?,?)",
+                       (cid, stem_string(p.get("title")), stem_string(desc[:4000]), ""))
+    conn.execute("INSERT OR REPLACE INTO fts_map VALUES (?,?)", (cid, cur.lastrowid))
+    conn.commit()
+    return cid
 
 
 def record_events(conn: sqlite3.Connection, project_id: str) -> int:
