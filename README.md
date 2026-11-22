@@ -266,7 +266,13 @@ Słowa potoczne („w naszej gminie”, „chcemy”) nie trafiają do wyszukiwa
 * **Moduł monitorowania** – dla postępowań w realizacji powiązanych z projektami sprawdza API BZP pod kątem nowych ogłoszeń
   (zmiana/wykonanie umowy), zapisuje je, przelicza zdarzenia i raportuje (zakładka „Import danych → Monitorowanie”).
 * **Sieć kontaktów** – „do kogo się zwrócić” z gotowym e-mailem (pomysł z pytań do mentorów).
-* **Wielosektorowość** – sektory i podsektory w bazie; BZP innych sektorów (drogi, kubatura, energetyka, kolej) ładowane z `data_lake`.
+* **Wielosektorowość** – rozwiązanie nie jest ograniczone do wod-kan. W bazie: wod-kan 31,9 tys. postępowań (16,5 tys. z wynikiem realizacji),
+  **drogi i mosty 4,2 tys. (2,5 tys.)**, **budynki 1,3 tys. (0,6 tys.)**, energetyka i OZE 173, kolej 77, inne roboty 8,2 tys. (3,6 tys.).
+  Sektor nowej inwestycji rozpoznają reguły i model (obiekt główny opisu: „przebudowa drogi wraz z kanalizacją deszczową” to droga);
+  wyszukiwanie dobiera inwestycje z tego samego sektora i podobnej skali, koszt na km liczony jest dla sieci, dróg i torów, a lista
+  kontrolna ma wariant ogólny. Katalog ryzyk R01–R15 jest wspólny dla robót budowlanych. Wzorce sektorów: `catalog.SECTOR_PATTERNS`,
+  sektory danych BZP: CPV (`catalog.SECTORS`) – dodanie sektora nie wymaga zmian w logice. Przykłady w „Nowa analiza → Inne sektory”:
+  droga powiatowa, most, termomodernizacja szkoły, fotowoltaika.
 * **Przypadki wzorcowe**, **ocena skuteczności działań**, **wykrywanie błędów w danych wejściowych**.
 * **Dodaj dane z BIP** (Import danych) – urzędnik wkleja adres strony BIP albo bezpośredni link do PDF/DOCX (lub kopiuje treść strony);
   system pobiera stronę i jej załączniki (protokoły, aneksy, umowy, zarządzenia), zapisuje je z adresem źródła i SHA-256, opcjonalnie

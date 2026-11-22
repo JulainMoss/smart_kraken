@@ -22,6 +22,20 @@ SECTORS = [
     {"code": "kolej", "name": "Kolej i transport szynowy", "status": "active", "cpv_prefixes": ["45234"]},
 ]
 
+# Rozpoznawanie sektora z opisu nowej inwestycji (tekst bez polskich znaków, małe litery).
+# Sektor główny = obiekt wymieniony najwcześniej w opisie (np. „przebudowa drogi wraz z kanalizacją deszczową” -> drogi).
+SECTOR_PATTERNS = {
+    "drogi": [r"\bdrog(?!ow\w* (wojew|krajow|powiat|gmin)\w* nr)", r"\bulic", r"chodnik", r"\bmost(u|y|ow|em|\b)", r"wiadukt", r"jezdni",
+              r"sciezk\w* rowerow", r"\brond(o|a)\b", r"skrzyzowani", r"zatok\w* autobus", r"parking"],
+    "kubatura": [r"budyn", r"\bszkol", r"przedszkol", r"\bzlob", r"hal\w* sportow", r"sal\w* gimnast", r"termomoderniz", r"remiz",
+                 r"swietlic", r"osrod\w* zdrowia", r"przychodni", r"bibliotek", r"docieplen", r"\bboisk", r"basen", r"plywalni", r"\bdom\w* kultury",
+                 r"mieszkan\w* komunal", r"\bdps\b|dom\w* pomocy spol"],
+    "energetyka": [r"fotowolt", r"\bpv\b", r"pomp\w* ciepla", r"kotlown", r"\boze\b", r"odnawialn\w* zrodl", r"biogaz", r"cieplownic",
+                   r"oswietleni\w* (uliczn|drog|led|ulic)", r"magazyn\w* energii", r"farm\w* (fotowolt|wiatr|sloneczn)", r"elektrown",
+                   r"sieci? (elektroenerget|cieplown)"],
+    "kolej": [r"kolej(?!n)", r"\bpkp\b", r"peron", r"tramwaj", r"\btorowisk", r"przejazd\w* kolejow", r"dworc|dworzec"],
+}
+
 SUBSECTORS = [
     {"code": "siec_wod", "sector": "wod-kan", "name": "Sieć wodociągowa",
      "scope": "sieci, przyłącza oraz obiekty służące do przesyłu i dystrybucji wody",
@@ -278,19 +292,19 @@ DEFAULT_SETTINGS = {
 # Lista kontrolna przygotowania – z materiału eksperckiego (inwestycja wodociągowa) + ogólne
 CHECKLIST = [
     {"code": "C1", "text": "Konkretny problem (zaopatrzenia w wodę / odprowadzania ścieków) i oczekiwany efekt inwestycji.", "ref": "Poradnik MFiPR 1.1–1.2",
-     "detect": r"problem|potrzeb|cel\w* (projektu|inwestycji)|brak\w* (dostepu|sieci)|niedobor|szamb|zbiornik\w* bezodplyw|efekt"},
+     "detect": r"problem|potrzeb|cel\w* (projektu|inwestycji)|brak\w* (dostepu|sieci)|niedobor|szamb|zbiornik\w* bezodplyw|efekt", "text_generic": 'Konkretny problem i oczekiwany efekt inwestycji (dla kogo, co się poprawi).'},
     {"code": "C2", "text": "Obszar obsługi oraz przybliżona liczba i charakter odbiorców.", "ref": "Poradnik MFiPR 1.3–1.4",
-     "detect": r"mieszkanc|odbiorc|gospodarstw|budynk|nieruchomosc|\brlm\b|posesj|przylacz"},
+     "detect": r"mieszkanc|odbiorc|gospodarstw|budynk|nieruchomosc|\brlm\b|posesj|przylacz", "text_generic": 'Obszar i liczba użytkowników (mieszkańcy, uczniowie, natężenie ruchu, odbiorcy energii).', "detect_generic": r"mieszkanc|odbiorc|uzytkownik|uczni|dzieci|ruch\w*|natezeni|pojazd|gospodarstw|budynk"},
     {"code": "C3", "text": "Przewidywani odbiorcy początkowi i wiarygodne przesłanki dalszego przyłączania nieruchomości.", "ref": "Poradnik MFiPR 2.1–2.3",
-     "detect": r"deklarac|zainteresowan|zgod\w* wlascicieli|przylaczen"},
+     "detect": r"deklarac|zainteresowan|zgod\w* wlascicieli|przylaczen", "text_generic": 'Uzgodnienia z przyszłymi użytkownikami i zarządcami (deklaracje, porozumienia, zgody).', "detect_generic": r"deklarac|porozumien|uzgodn|zgod\w* (wlascicieli|zarzadc)|zarzadc"},
     {"code": "C4", "text": "Orientacyjny przebieg i długość sieci oraz zakres przewidywanych przyłączy.", "ref": "Poradnik MFiPR 3.1–3.4",
-     "detect": r"\d+[,.]?\d*\s*(km|m\b|mb\b|metr)|dlugos"},
+     "detect": r"\d+[,.]?\d*\s*(km|m\b|mb\b|metr)|dlugos", "text_generic": 'Skala inwestycji: długość, powierzchnia, kubatura lub moc.', "detect_generic": r"\d+[,.]?\d*\s*(km|m\b|mb\b|metr|m2|m²|m3|kw|kwp|mw|mwp)|dlugos|powierzchni|kubatur|moc\w*"},
     {"code": "C5", "text": "Przewidywane miejsce zasilania/odbioru i wstępne stanowisko operatora (możliwość dostawy wody / przyjęcia ścieków).", "ref": "Poradnik MFiPR 4.1–4.4",
-     "detect": r"operator|przedsiebiorstw\w* (wodociag|komunal)|zaklad\w* (wodociag|komunal|gospodarki)|wlaczeni|punkt\w* (wlaczenia|zasilania)|oczyszczalni|warunk\w* techniczn"},
+     "detect": r"operator|przedsiebiorstw\w* (wodociag|komunal)|zaklad\w* (wodociag|komunal|gospodarki)|wlaczeni|punkt\w* (wlaczenia|zasilania)|oczyszczalni|warunk\w* techniczn", "text_generic": 'Przyłącza i zależności od dostawców mediów lub zarządców (energia, woda, ciepło, zarządca drogi lub torów).', "detect_generic": r"przylacz|zarzadc|warunk\w* (przylacz|techniczn)|operator|dostawc|zasilani|siec\w* (energet|cieplown|wodociag)"},
     {"code": "C6", "text": "Wstępna trasa sieci, rodzaj własności gruntów i znane trudności z dostępem.", "ref": "Poradnik MFiPR 5.1–5.4",
-     "detect": r"dzialk|grunt|wlasnos|pas\w* drogow|sluzebnos|wlasciciel"},
+     "detect": r"dzialk|grunt|wlasnos|pas\w* drogow|sluzebnos|wlasciciel", "text_generic": 'Lokalizacja, własność gruntów i znane trudności z dostępem do terenu.'},
     {"code": "C7", "text": "Główne przeszkody lokalizacyjne (drogi, kolej, cieki, uzbrojenie) i zależności od innych inwestycji.", "ref": "Poradnik MFiPR 5.4; 6.1–6.2",
-     "detect": r"kolizj|kolej|ciek|rzek|drog\w* (wojew|krajow)|uzbrojen|przewiert|przeszkod"},
+     "detect": r"kolizj|kolej|ciek|rzek|drog\w* (wojew|krajow)|uzbrojen|przewiert|przeszkod", "text_generic": 'Główne przeszkody (drogi, kolej, cieki, uzbrojenie terenu, ruch lub zajęcia w trakcie robót) i zależności od innych inwestycji.', "detect_generic": r"kolizj|kolej|ciek|rzek|drog\w* (wojew|krajow)|uzbrojen|przeszkod|ruch\w*|objazd|zajec|uzytkowani\w* w trakcie"},
     {"code": "C8", "text": "Wstępne rozpoznanie potrzeby decyzji środowiskowej i ograniczeń ochrony przyrody.", "ref": "Poradnik MFiPR 6.3–6.5",
      "detect": r"srodowisk|natura 2000|decyzj\w* srodowisk|wodnoprawn|ochron\w* przyrody"},
     {"code": "C9", "text": "Podział odpowiedzialności za przygotowanie, projekt, nieruchomości, decyzje i eksploatację oraz główne ryzyka.", "ref": "Poradnik MFiPR 7.1–7.5",

@@ -27,6 +27,8 @@ zamierzamy potrzebujemy musimy bedziemy będziemy mamy mam prosze proszę pomoc 
 okolo około mniej wiecej więcej przyszlym przyszłym przyszly przyszły nastepnym następnym tego takze także bardzo dobrze moze może
 ktos ktoś cos coś czyli wlasnie właśnie""".split())
 
+SECTOR_LABEL = {s["code"]: s["name"] for s in catalog.SECTORS}
+
 WORKS_GROUPS = [{"budowa", "rozbudowa"}, {"przebudowa", "modernizacja", "remont/renowacja"}]
 VAT = 1.23
 
@@ -96,6 +98,17 @@ def search(conn: sqlite3.Connection, q: dict[str, Any], top_k: int | None = None
         sql += " ORDER BY year DESC LIMIT 1500"
         for (tid,) in conn.execute(sql, args):
             cands.setdefault(tid, 0.0)
+    qsector = P.get("sector") or ""
+    if not sub and qsector and qsector not in ("wod-kan", "inne"):
+        # inwestycje spoza wod-kan: kandydaci z tego samego sektora i podobnej skali
+        sql = "SELECT tender_id FROM procedures WHERE sector=?" + (" AND has_outcome=1" if only_completed else "")
+        args = [qsector]
+        if budget:
+            sql += " AND contract_value BETWEEN ? AND ?"
+            args += [budget / 4, budget * 4]
+        sql += " ORDER BY year DESC LIMIT 1500"
+        for (tid,) in conn.execute(sql, args):
+            cands.setdefault(tid, 0.0)
     if not cands:
         return []
     ids = list(cands)
@@ -141,6 +154,9 @@ def search(conn: sqlite3.Connection, q: dict[str, Any], top_k: int | None = None
         elif sub and (psub in qextra or sub in pextra):
             comp["subsector"] = 0.6
             why.append(f"pokrewny zakres: {sub_names.get(psub, psub)}")
+        elif not sub and qsector not in ("", "inne", "wod-kan") and p.get("sector") == qsector:
+            comp["subsector"] = 1.0
+            why.append(f"ten sam sektor: {SECTOR_LABEL.get(qsector, qsector)}")
         else:
             comp["subsector"] = 0.0
         # skala: wartość i długość sieci
@@ -152,7 +168,7 @@ def search(conn: sqlite3.Connection, q: dict[str, Any], top_k: int | None = None
         if s_val is not None and s_val >= 0.5:
             why.append(f"podobna skala kosztu: {fmt_pln(pv)} (planowane: {fmt_pln(budget)})")
         if s_len is not None and s_len >= 0.5:
-            why.append(f"podobna długość sieci: {p['length_km']:.1f} km (planowane: {P['length_km']:.1f} km)".replace(".", ","))
+            why.append(f"podobna długość: {p['length_km']:.1f} km (planowane: {P['length_km']:.1f} km)".replace(".", ","))
         # rodzaj robót
         qw, pw = P.get("works_type") or "", p.get("works_type") or ""
         if qw and pw == qw:

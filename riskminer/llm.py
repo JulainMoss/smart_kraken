@@ -150,10 +150,16 @@ def chat_json(system: str, user: str, schema: dict | None = None) -> dict:
         return json.loads(m.group(0)) if m else {}
 
 
+# etykieta dla modelu -> (sektor, podsektor wod-kan)
 SUBSECTOR_LABELS = {
-    "kanalizacja sanitarna": "kan_san", "sieć wodociągowa": "siec_wod", "oczyszczalnia ścieków": "oczyszczalnia",
-    "stacja uzdatniania wody / ujęcie / zbiornik": "suw", "kanalizacja deszczowa / retencja": "deszcz",
-    "inny obiekt wodno-kanalizacyjny": "inne_wk", "inny sektor (drogi, budynki, energetyka…)": "",
+    "kanalizacja sanitarna": ("wod-kan", "kan_san"), "sieć wodociągowa": ("wod-kan", "siec_wod"),
+    "oczyszczalnia ścieków": ("wod-kan", "oczyszczalnia"), "stacja uzdatniania wody / ujęcie / zbiornik": ("wod-kan", "suw"),
+    "kanalizacja deszczowa / retencja": ("wod-kan", "deszcz"), "inny obiekt wodno-kanalizacyjny": ("wod-kan", "inne_wk"),
+    "droga, ulica, most, chodnik, ścieżka rowerowa": ("drogi", ""),
+    "budynek (szkoła, przedszkole, hala, termomodernizacja, obiekt publiczny)": ("kubatura", ""),
+    "energetyka i OZE (fotowoltaika, pompy ciepła, ciepłownictwo, oświetlenie)": ("energetyka", ""),
+    "kolej lub tramwaj": ("kolej", ""),
+    "inny rodzaj inwestycji": ("inne", ""),
 }
 WORKS_LABELS = ["budowa", "rozbudowa", "przebudowa", "modernizacja", "remont/renowacja", ""]
 PROVINCE_LABELS = ["dolnośląskie", "kujawsko-pomorskie", "lubelskie", "lubuskie", "łódzkie", "małopolskie", "mazowieckie", "opolskie",
@@ -204,14 +210,14 @@ Zasady:
 - Wartości bierz WYŁĄCZNIE z opisu użytkownika. Nie zgaduj. Gdy czegoś nie ma – "" (pusty tekst) i pusty cytat.
 - "cytat" to DOSŁOWNY, krótki fragment opisu (najwyżej 10 słów), z którego pochodzi wartość.
 - czy_konkretna_inwestycja: true, gdy opis mówi, CO ma zostać zbudowane lub przebudowane; false, gdy jest zbyt ogólny.
-- rodzaj_inwestycji: główny obiekt robót. Drogi, budynki, szkoły itp. = "inny sektor (drogi, budynki, energetyka…)".
+- rodzaj_inwestycji: GŁÓWNY obiekt robót (np. „przebudowa drogi wraz z kanalizacją deszczową” to droga, a nie kanalizacja).
 - rodzaj_robot: budowa (nowy obiekt), rozbudowa (powiększenie istniejącego), przebudowa, modernizacja, remont/renowacja.
 - zaprojektuj_i_wybuduj: "tak" tylko, gdy wykonawca ma też zaprojektować obiekt (formuła „zaprojektuj i wybuduj”, PFU).
 - zamawiajacy: nazwa instytucji (np. „Gmina Lipowo”). miejscowosc: w mianowniku. Bez adresów.
 - wojewodztwo: z listy; podaj także, gdy jednoznacznie wynika z nazwy powiatu lub znanego miasta.
 - kwota.tekst: PRZEPISZ kwotę tak jak w opisie, z „mln” lub „tys.” (np. "6 mln zł"); vat: netto / brutto / nieokreślone.
 - czas_realizacji: liczba (np. "18", "1", "półtora") i jednostka; „rok na realizację” = liczba "1", jednostka "lata".
-- dlugosc_sieci_km: łączna długość sieci lub rurociągów w km (np. "10,7"); gdy podano w metrach – przelicz na km.
+- dlugosc_sieci_km: łączna długość sieci, rurociągów, drogi lub torów w km (np. "10,7"); gdy podano w metrach – przelicz na km.
 - liczba_przylaczy: liczba przyłączy, jeśli podana.
 - elementy: tylko elementy z listy, które naprawdę występują w opisie.
 - slowa_kluczowe: 3–8 krótkich fraz technicznych do wyszukiwania (np. "kanalizacja grawitacyjna", "przepompownia ścieków",

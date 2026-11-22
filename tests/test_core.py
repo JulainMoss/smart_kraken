@@ -180,3 +180,19 @@ class TestClaudeCodeProvider(unittest.TestCase):
         self.assertIn("--json-schema", cmd)
         self.assertEqual(cmd[cmd.index("--tools") + 1], "")           # bez narzędzi
         self.assertEqual(run.call_args.kwargs["input"], "tekst")     # opis przez stdin, nie w linii poleceń
+
+
+class TestSectors(unittest.TestCase):
+    def test_sector_from_text(self):
+        from riskminer.query import sector_from_text
+        cases = {
+            "Przebudowa drogi gminnej wraz z kanalizacją deszczową w Brzezinach": "drogi",
+            "Rozbudowa sieci kanalizacji sanitarnej; trasa przecina drogę wojewódzką nr 598": "wod-kan",
+            "Termomodernizacja budynku szkoły podstawowej z pompą ciepła i fotowoltaiką": "kubatura",
+            "Budowa instalacji fotowoltaicznych na 12 budynkach użyteczności publicznej": "energetyka",
+            "Kolejny etap budowy wodociągu w gminie": "wod-kan",
+            "Modernizacja przejazdu kolejowego i peronu": "kolej",
+            "Remont mostu na rzece Wkrze": "drogi",
+        }
+        for text, sector in cases.items():
+            self.assertEqual(sector_from_text(text)[0], sector, text)

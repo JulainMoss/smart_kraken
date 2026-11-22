@@ -92,9 +92,12 @@ def understand(conn: sqlite3.Connection, text: str, use_llm: bool = True) -> dic
         P[key] = {"value": value, "quote": quote, "source": source}
 
     sub_names = {s["code"]: s["name"] for s in clf.subsectors}
-    put("subsector", sub, _quote(text, r"kanalizac|wodociag|oczyszczal|uzdatnian|deszczow|retencj|ujeci"))
+    sector, squote = sector_from_text(text, sub)
+    if sector != "wod-kan" and sub:   # np. droga z kanalizacją deszczową: kanalizacja jako zakres pokrewny
+        extra, sub = list(dict.fromkeys([sub] + list(extra))), ""
+    put("subsector", sub, _quote(text, r"kanalizac|wodociag|oczyszczal|uzdatnian|deszczow|retencj|ujeci") if sub else "")
     put("subsectors_extra", extra)
-    put("sector", "wod-kan" if sub else "inne")
+    put("sector", sector, squote)
     wt = clf.works_type(first) or clf.works_type(text)
     put("works_type", wt, _quote(text, r"\b(budow|rozbudow|przebudow|moderniz|remont|renowac)\w*"))
     db_ = clf.design_build(text)
@@ -105,6 +108,13 @@ def understand(conn: sqlite3.Connection, text: str, use_llm: bool = True) -> dic
     d = extract_duration_days(text)
     put("duration_days", d["days"] if d else None, d["quote"] if d else "")
     L = extract_length_km(text)
+    if sector in ("drogi", "kolej"):
+        # drogi i tory: „na odcinku 3,2 km” to długość całej inwestycji (w sieciach wod-kan bywa fragmentem)
+        m = re.search(r"(\d+(?:[,.]\d+)?)\s*(km|kilometr)", f)
+        if m and not L:
+            L = float(m.group(1).replace(",", "."))
+    if L is not None and sector in ("drogi", "kolej", "kubatura", "energetyka") and L < 0.2:
+        L = None   # np. most o długości 42 m – to nie długość trasy
     put("length_km", L, _quote(text, r"\d+[,.]?\d*\s*(km|kilometr|mb\b|m\b)") if L else "")
     con = extract_connections(text)
     put("connections", con, _quote(text, r"\d+\s*(szt\.?\s*)?przylacz|przylacz\w*[^0-9]{0,20}\d+") if con else "")
@@ -126,14 +136,17 @@ def understand(conn: sqlite3.Connection, text: str, use_llm: bool = True) -> dic
 
     if use_llm and llm.enabled():
         _merge_llm(clf, q, text, put)
+    Lm = P["length_km"]["value"]
+    if Lm is not None and P["sector"]["value"] in ("drogi", "kolej", "kubatura", "energetyka") and Lm < 0.2:
+        put("length_km", None)   # długość obiektu (np. mostu 42 m), a nie trasy – nie do porównań kosztu na km
     sub = P["subsector"]["value"]
-    q["vague"] = _is_vague(P) or (q.get("llm", {}).get("czy_konkretna_inwestycja") is False and not sub)
+    q["vague"] = _is_vague(P) or (q.get("llm", {}).get("czy_konkretna_inwestycja") is False and not sub and P["sector"]["value"] == "inne")
     if q["vague"]:
         q["warnings"].insert(0, "Opis jest zbyt ogólny: nie wiadomo, co ma zostać zbudowane. Dopisz rodzaj inwestycji (np. kanalizacja, "
-                                "wodociąg, oczyszczalnia), skalę (długość sieci, liczba przyłączy), budżet i termin – inaczej porównanie będzie mało wiarygodne.")
-    if not sub:
-        q["warnings"].append("Nie rozpoznano podsektora wod-kan – wyszukiwanie oprze się głównie na treści opisu.")
-    q["labels"] = {"subsector": sub_names.get(P["subsector"]["value"], ""), "province": PROVINCES.get(P["province"]["value"] or "", ("", ""))[0],
+                                "droga, budynek szkoły, fotowoltaika), skalę (długość, powierzchnia, moc), budżet i termin – inaczej porównanie będzie mało wiarygodne.")
+    if not sub and P["sector"]["value"] == "inne":
+        q["warnings"].append("Nie rozpoznano rodzaju inwestycji – wyszukiwanie oprze się głównie na treści opisu.")
+    q["labels"] = {"subsector": sub_names.get(P["subsector"]["value"], ""), "sector": SECTOR_NAMES.get(P["sector"]["value"], ""), "province": PROVINCES.get(P["province"]["value"] or "", ("", ""))[0],
                    "features": [clf.feature_names().get(x, x) for x in P["features"]["value"]]}
     return q
 
@@ -170,8 +183,33 @@ def _num(s: str) -> float | None:
 
 def _is_vague(P: dict) -> bool:
     v = lambda k: P.get(k, {}).get("value")
-    signals = sum(bool(x) for x in (v("subsector"), v("works_type"), v("budget"), v("length_km"), v("connections"), v("duration_days")))
-    return not v("subsector") and signals <= 1 and len(v("features") or []) <= 1
+    known = v("subsector") or (v("sector") or "inne") != "inne"
+    signals = sum(bool(x) for x in (known, v("works_type"), v("budget"), v("length_km"), v("connections"), v("duration_days")))
+    return not known and signals <= 1 and len(v("features") or []) <= 1
+
+
+SECTOR_NAMES = {"wod-kan": "Gospodarka wodno-ściekowa", "drogi": "Drogi i mosty", "kubatura": "Budynki i obiekty kubaturowe",
+                "energetyka": "Energetyka i OZE", "kolej": "Kolej i transport szynowy", "inne": "Inne"}
+
+
+def sector_from_text(text: str, sub: str = "") -> tuple[str, str]:
+    """Sektor główny = rodzaj obiektu wymieniony najwcześniej w początku opisu (tytuł / pierwsze zdania)."""
+    from .catalog import SECTOR_PATTERNS, SUBSECTORS
+    f = fold(text)
+    pats = {k: v for k, v in SECTOR_PATTERNS.items()}
+    pats["wod-kan"] = [p for s_ in SUBSECTORS for p in s_.get("patterns", [])] + [r"kanalizac", r"wodociag"]
+    best = None
+    for window in (f[:400], f):
+        for sec, rx in pats.items():
+            for p in rx:
+                m = re.search(p, window)
+                if m and (best is None or m.start() < best[1]):
+                    best = (sec, m.start(), m.end())
+        if best:
+            break
+    if not best:
+        return ("wod-kan" if sub else "inne"), ""
+    return best[0], text[max(0, best[1] - 30):best[2] + 40].replace("\n", " ").strip()
 
 
 def _merge_llm(clf: Classifier, q: dict, text: str, put) -> None:
@@ -211,12 +249,20 @@ def _merge_llm(clf: Classifier, q: dict, text: str, put) -> None:
     # rodzaj inwestycji
     v, c = field("rodzaj_inwestycji")
     if v in llm.SUBSECTOR_LABELS:
-        code = llm.SUBSECTOR_LABELS[v]
-        if code:
-            category("subsector", code, c, lambda x: sub_names.get(x, x))
-        elif P["subsector"]["value"]:  # model: inny sektor, reguły: wod-kan – zostaje wartość reguł, użytkownik widzi rozbieżność
-            conflicts["subsector"] = "model: inny sektor (nie wod-kan)"
-        P["sector"] = {"value": "wod-kan" if P["subsector"]["value"] else "inne", "quote": "", "source": P["subsector"]["source"]}
+        msec, msub = llm.SUBSECTOR_LABELS[v]
+        rsec = P["sector"]["value"]
+        ok = verify_quote(c, text)
+        if msub:
+            category("subsector", msub, c, lambda x: sub_names.get(x, x))
+        if msec != rsec and (ok or rsec == "inne"):
+            if rsec != "inne":
+                conflicts["sector"] = f"reguły: {SECTOR_NAMES.get(rsec, rsec)}"
+            put("sector", msec, c if ok else "", "model")
+            if msec != "wod-kan" and P["subsector"]["value"]:   # obiekt główny spoza wod-kan – kanalizacja/woda jako zakres pokrewny
+                P["subsectors_extra"]["value"] = list(dict.fromkeys([P["subsector"]["value"]] + list(P["subsectors_extra"]["value"] or [])))
+                put("subsector", "", "", "model")
+        elif msec == rsec:
+            P["sector"]["source"] = "model i reguły"
     v, c = field("rodzaj_robot")
     if v in llm.WORKS_LABELS:
         category("works_type", v, c)
@@ -294,7 +340,13 @@ def apply_overrides(q: dict[str, Any], overrides: dict[str, Any] | None) -> dict
             q["params"][k] = {"value": v, "quote": "", "source": "użytkownik"}
     if overrides:
         sub = q["params"].get("subsector", {}).get("value")
-        q["params"]["sector"] = {"value": "wod-kan" if sub else "inne", "quote": "", "source": "użytkownik"}
+        if sub:
+            q["params"]["sector"] = {"value": "wod-kan", "quote": "", "source": "użytkownik"}
+        elif "sector" not in overrides and q["params"].get("sector", {}).get("value") == "wod-kan":
+            q["params"]["sector"] = {"value": "inne", "quote": "", "source": "użytkownik"}
+        q.setdefault("labels", {})["sector"] = SECTOR_NAMES.get(q["params"]["sector"]["value"], "")
+        from .catalog import SUBSECTORS
+        q["labels"]["subsector"] = next((s_["name"] for s_ in SUBSECTORS if s_["code"] == sub), "")
         # opis ogólny, ale użytkownik uzupełnił formularz – ocena na podstawie poprawionych parametrów
         q["vague"] = bool(q.get("vague")) and _is_vague(q["params"])
     return q

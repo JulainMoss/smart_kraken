@@ -188,9 +188,16 @@ def analyze(conn: sqlite3.Connection, q: dict[str, Any], title: str | None = Non
     # ---------------- lista kontrolna – czego brakuje w opisie
     checklist = []
     ftext = fold(q.get("text", ""))
+    wk = (P.get("sector") or "wod-kan") == "wod-kan" or bool(P.get("subsector"))
+    from .catalog import CHECKLIST as _CL
+    _gen = {c["code"]: c for c in _CL}
     for item in setting(conn, "checklist", []):
-        present = bool(re.search(item["detect"], ftext)) if item.get("detect") else False
-        checklist.append({"code": item["code"], "text": item["text"], "ref": item.get("ref"), "present": present})
+        item = {**{k: v for k, v in _gen.get(item["code"], {}).items() if k.endswith("_generic")}, **item}
+        rx = item.get("detect") if wk else (item.get("detect_generic") or item.get("detect"))
+        present = bool(re.search(rx, ftext)) if rx else False
+        text = item["text"] if wk else (item.get("text_generic") or item["text"])
+        ref = item.get("ref") if wk else ("lista ogólna (na podstawie poradnika MFiPR)" if item.get("text_generic") else item.get("ref"))
+        checklist.append({"code": item["code"], "text": text, "ref": ref, "present": present})
 
     # ---------------- czerwone flagi
     flags = _flags(P, time_fc, cost_fc, budget_check, tender_fc, risks, checklist, n)
@@ -240,13 +247,17 @@ def _auto_title(q: dict) -> str:
         return m.group(1).strip()
     t = txt.strip().split("\n")[0].strip()
     casual = re.match(r"(?i)(dzień dobry|witam|szanown|cześć|proszę|chcemy|chcielibyśmy|planujemy|mamy|potrzebujemy)", t)
-    if t and len(t) <= 110 and not casual and not t.endswith("?"):
-        return t
+    clause = re.split(r"[.;:](?:\s|$)", t)[0].strip()
+    if len(clause) > 110:
+        clause = re.split(r",\s", clause)[0].strip()
+    if 20 <= len(clause) <= 110 and not casual and not clause.endswith("?"):
+        return clause
     # tytuł z rozpoznanych parametrów, np. „Budowa – kanalizacja sanitarna, ok. 5 km (Gmina Lipowo)”
     P = {k: v.get("value") for k, v in q.get("params", {}).items()}
-    sub = (q.get("labels") or {}).get("subsector") or ""
+    sub = (q.get("labels") or {}).get("subsector") or {"drogi": "droga / most", "kubatura": "budynek", "energetyka": "energetyka i OZE",
+                                                         "kolej": "infrastruktura kolejowa"}.get(P_sector(q), "")
     wt = (P.get("works_type") or "").split("/")[0]
-    head = " – ".join(x for x in (wt.capitalize(), sub.lower()) if x) or "Inwestycja"
+    head = " – ".join(x for x in (wt.capitalize(), sub[:1].lower() + sub[1:]) if x) or "Inwestycja"
     extra = ["ok. " + f"{P['length_km']:g}".replace(".", ",") + " km"] if P.get("length_km") else []
     if P.get("budget"):
         extra.append(fmt_pln(P["budget"]))
@@ -270,6 +281,14 @@ def _cancellations(conn: sqlite3.Connection, q: dict, exclude: set[str] | None) 
     return {"n": n, "k": k, "share": k / n if n else None, "ci90": [l, h], "over_budget": budget_reason}
 
 
+def P_sector(q: dict) -> str:
+    return ((q.get("params") or {}).get("sector") or {}).get("value") or ""
+
+
+def _unit_noun(P: dict) -> str:
+    return {"wod-kan": "sieci ", "drogi": "drogi ", "kolej": "linii "}.get(P.get("sector") or "wod-kan", "")
+
+
 def _flags(P, time_fc, cost_fc, budget, tender, risks, checklist, n) -> list[dict[str, Any]]:
     flags = []
 
@@ -291,7 +310,7 @@ def _flags(P, time_fc, cost_fc, budget, tender, risks, checklist, n) -> list[dic
         add("amber", f"Planowany czas ({_days_txt(ud)}) jest krótszy niż mediana rzeczywistego czasu podobnych realizacji ({_days_txt(act['median'])}).",
             f"N={act['n']}")
     if budget.get("verdict") == "niski":
-        add("red", f"Budżet na km sieci ({fmt_pln(budget['user_per_km'])}/km) jest niższy niż w {_pct(1 - budget['user_percentile'])} podobnych inwestycji.",
+        add("red", f"Budżet na km {_unit_noun(P)}({fmt_pln(budget['user_per_km'])}/km) jest niższy niż w {_pct(1 - budget['user_percentile'])} podobnych inwestycji.",
             f"koszt/km: mediana {fmt_pln(budget['per_km']['median'])}, N={budget['per_km']['n']}")
     ch = cost_fc.get("change_pct", {})
     if ch.get("n", 0) >= 5 and cost_fc.get("share_increase") and cost_fc["share_increase"] >= 0.35:
@@ -310,7 +329,8 @@ def _flags(P, time_fc, cost_fc, budget, tender, risks, checklist, n) -> list[dic
             "katalog ekspercki MFiPR", "WNIOSEK")
     feats = set(P.get("features") or [])
     if "droga_kraj_woj" in feats or "kolej" in feats or "ciek" in feats:
-        add("amber", "Przejścia przez drogi wyższej kategorii / kolej / cieki – uzgodnienia z podmiotami trzecimi (R04) i technologia bezwykopowa.",
+        add("amber", "Przejścia przez drogi wyższej kategorii / kolej / cieki – uzgodnienia z podmiotami trzecimi (R04)"
+            + (" i technologia bezwykopowa." if (P.get("sector") or "wod-kan") == "wod-kan" else "."),
             "elementy w opisie", "WNIOSEK")
     share = {r["code"]: r for r in risks}
     for feat, code, txt in (("tereny_prywatne", "R03", "Trasa przez grunty prywatne – brak zgód/służebności to częsta przyczyna zmian trasy i opóźnień"),
@@ -422,9 +442,9 @@ def plain_summary(rep: dict[str, Any]) -> list[str]:
         s.append(f"Koszt: w {_pct(c['share_increase'])} umów wypłacono więcej niż w umowie; mediana zmiany {_sg(ch['median'])}, "
                  f"w 10% najgorszych przypadków ponad {_sg(ch['p90'])}.")
     if b.get("verdict"):
-        s.append({"niski": "Planowany budżet na kilometr sieci jest NISKI na tle podobnych inwestycji – sprawdź kosztorys.",
-                  "wysoki": "Planowany budżet na kilometr sieci jest wysoki na tle podobnych inwestycji (bezpieczny zapas lub zawyżony kosztorys).",
-                  "typowy": "Planowany budżet na kilometr sieci mieści się w typowym zakresie podobnych inwestycji."}[b["verdict"]])
+        s.append({"niski": "Planowany budżet na kilometr jest NISKI na tle podobnych inwestycji – sprawdź kosztorys.",
+                  "wysoki": "Planowany budżet na kilometr jest wysoki na tle podobnych inwestycji (bezpieczny zapas lub zawyżony kosztorys).",
+                  "typowy": "Planowany budżet na kilometr mieści się w typowym zakresie podobnych inwestycji."}[b["verdict"]])
     if rep["risks"]:
         top = ", ".join(f"{r['name'].lower()} ({_pct(r['share'])})" for r in rep["risks"][:3])
         s.append(f"Najczęstsze problemy w podobnych inwestycjach: {top}.")

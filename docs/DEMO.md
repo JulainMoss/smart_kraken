@@ -50,14 +50,17 @@ python -m riskminer test-run --project rekord.xlsx --investment opis.docx --out 
    formularz, przy każdej wartości widać cytat z opisu i źródło (model / reguły / zgodne). Rozbieżności są oznaczone.
 2. **Wygeneruj raport** – ryzyko opóźnienia z przedziałem 90% i N, rzeczywisty czas, zmiana kosztu, ocena budżetu na km,
    sygnały ostrzegawcze; zakładka **Problemy** – każdy wniosek ma cytat i numer ogłoszenia (klik → treść ogłoszenia z podświetleniem).
-3. **Przykład „Zbyt mały budżet i zbyt krótki termin”** – czerwone flagi: budżet/km niższy niż w 82% podobnych, termin krótszy
+3. **Uniwersalność – przykłady „Inne sektory”** (droga powiatowa, most, termomodernizacja szkoły, fotowoltaika): sektor rozpoznany
+   z opisu, porównanie z 25 zakończonymi inwestycjami tego samego rodzaju (np. przebudowy dróg powiatowych), koszt na km drogi,
+   ryzyka i rekomendacje. W bazie: 4,2 tys. postępowań drogowych, 1,3 tys. budynków, energetyka, kolej.
+4. **Przykład „Zbyt mały budżet i zbyt krótki termin”** – czerwone flagi: budżet/km niższy niż w 82% podobnych, termin krótszy
    niż mediana.
-4. **Do kogo się zwrócić** – gminy, które robiły to samo (z sukcesem lub z problemami), z gotowym e-mailem.
-5. **Projekty → RM-2026-022 (Wolin)** – numer BZP z rekordu nie istnieje; system wykrył błąd i odnalazł postępowanie po odwołaniach.
-6. **Weryfikacja ekspercka** – zatwierdź/odrzuć niepewne powiązanie; zmień kategorię zdarzenia; historia decyzji.
-7. **Import danych → Dodaj dane z BIP** – wklej adres strony BIP (np. zapytanie ofertowe z załącznikami); system pobiera stronę
+5. **Do kogo się zwrócić** – gminy, które robiły to samo (z sukcesem lub z problemami), z gotowym e-mailem.
+6. **Projekty → RM-2026-022 (Wolin)** – numer BZP z rekordu nie istnieje; system wykrył błąd i odnalazł postępowanie po odwołaniach.
+7. **Weryfikacja ekspercka** – zatwierdź/odrzuć niepewne powiązanie; zmień kategorię zdarzenia; historia decyzji.
+8. **Import danych → Dodaj dane z BIP** – wklej adres strony BIP (np. zapytanie ofertowe z załącznikami); system pobiera stronę
    i załączniki, zapisuje źródło i SHA-256, wskazuje fragmenty ryzyka do weryfikacji.
-8. **Przetwórz pliki** – ścieżka testu jury jednym kliknięciem.
+9. **Przetwórz pliki** – ścieżka testu jury jednym kliknięciem.
 
 ## Przykładowe opisy do pokazu (wbudowane w „Nowa analiza → Przykłady”)
 
@@ -70,6 +73,10 @@ python -m riskminer test-run --project rekord.xlsx --investment opis.docx --out 
 | **Stacja uzdatniania wody z wodociągiem** (Juchnowiec Kościelny) | dopasowanie do wcześniejszych inwestycji tej samej gminy, termin krótszy niż u 75% |
 | **Rzadka technologia: kanalizacja podciśnieniowa** | wyszukiwanie po znaczeniu – znajduje stację próżniową (Abramów) |
 | **Kanalizacja deszczowa i retencja** (Łowicz) | podsektor deszczowy, wysoki udział robót dodatkowych |
+| **Przebudowa drogi powiatowej z chodnikiem** (3,2 km, 9 mln, ZiW) | sektor drogowy: porównanie z przebudowami dróg, koszt na km drogi |
+| **Budowa mostu na rzece** (42 m, 7 mln) | mosty: 5 najbliższych to przebudowy mostów, pozwolenie wodnoprawne (R04) |
+| **Termomodernizacja szkoły** (4,5 mln, 10 mies.) | budynki: termomodernizacje szkół, roboty dodatkowe w 56% umów |
+| **Fotowoltaika na budynkach gminy** (600 kW, 3,8 mln) | energetyka/OZE: termin krótszy niż u 75% podobnych instalacji |
 
 Opis zbyt ogólny (np. „Proszę o pomoc, planujemy jakąś inwestycję w naszej gminie”) daje czerwony komunikat z prośbą
 o uzupełnienie – system nie udaje pewności.

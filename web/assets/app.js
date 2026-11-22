@@ -10,6 +10,8 @@ const SUB = {siec_wod:"Sieć wodociągowa", kan_san:"Kanalizacja sanitarna", ocz
   suw:"Uzdatnianie i zaopatrzenie w wodę", deszcz:"Kanalizacja deszczowa i retencja", inne_wk:"Inne obiekty wod-kan"};
 const PROV = {PL02:"dolnośląskie",PL04:"kujawsko-pomorskie",PL06:"lubelskie",PL08:"lubuskie",PL10:"łódzkie",PL12:"małopolskie",PL14:"mazowieckie",
   PL16:"opolskie",PL18:"podkarpackie",PL20:"podlaskie",PL22:"pomorskie",PL24:"śląskie",PL26:"świętokrzyskie",PL28:"warmińsko-mazurskie",PL30:"wielkopolskie",PL32:"zachodniopomorskie"};
+const SECT = {"wod-kan":"Gospodarka wodno-ściekowa", drogi:"Drogi i mosty", kubatura:"Budynki (szkoły, hale, termomodernizacja)",
+  energetyka:"Energetyka i OZE", kolej:"Kolej i tramwaje", inne:"Inne"};
 const WORKS = ["budowa","rozbudowa","przebudowa","modernizacja","remont/renowacja"];
 const FEATS = {przepompownia:"przepompownia ścieków", tloczny:"rurociąg tłoczny", grawitacyjna:"kanalizacja grawitacyjna", podcisnieniowa:"kanalizacja podciśnieniowa",
   przylacza:"przyłącza / sięgacze", bezwykopowo:"technologia bezwykopowa", droga_kraj_woj:"przejście pod drogą woj./krajową", kolej:"skrzyżowanie z koleją",
@@ -101,7 +103,10 @@ Znane trudności: wysoki poziom wód gruntowych w rejonie ul. Polnej, część t
   {t:"Stacja uzdatniania wody z wodociągiem", x:`Budowa stacji uzdatniania wody wraz z siecią wodociągową o długości 4 km w gminie Juchnowiec Kościelny, woj. podlaskie. Budżet 5 mln zł netto, 10 miesięcy.`},
   {t:"Rzadka technologia: kanalizacja podciśnieniowa", x:`Budowa kanalizacji podciśnieniowej ze stacją próżniową dla 80 budynków w gminie nadmorskiej, woj. pomorskie. Długość sieci 2,5 km, budżet 4 mln zł, realizacja 12 miesięcy.`},
   {t:"Kanalizacja deszczowa i retencja", x:`Budowa kanalizacji deszczowej ze zbiornikiem retencyjnym i separatorem w mieście Łowicz, woj. łódzkie. Długość kolektorów 3,2 km, budżet 9 mln zł netto, 14 miesięcy. Inwestycja z dofinansowaniem z programu FEnIKS.`},
-];
+  {g:"Inne sektory", t:"Przebudowa drogi powiatowej z chodnikiem", x:`Powiat Wołomiński planuje przebudowę drogi powiatowej nr 4310W na odcinku 3,2 km wraz z budową chodnika, ścieżki rowerowej, odwodnienia i przebudową przepustów. Wartość 9 mln zł brutto, realizacja 12 miesięcy w formule zaprojektuj i wybuduj. Na trasie kolizje z siecią gazową i energetyczną, konieczna wycinka drzew i czasowa organizacja ruchu.`},
+  {g:"Inne sektory", t:"Budowa mostu na rzece", x:`Rozbiórka i budowa nowego mostu w ciągu drogi gminnej na rzece Wieprz w miejscowości Krasnobród, długość obiektu 42 m, nośność 50 t. Budżet 7 mln zł brutto, 14 miesięcy. Wymagane pozwolenie wodnoprawne i objazd na czas robót.`},
+  {g:"Inne sektory", t:"Termomodernizacja szkoły", x:`Gmina Krzeszowice planuje termomodernizację budynku szkoły podstawowej: docieplenie ścian i stropodachu, wymianę okien i drzwi, modernizację instalacji c.o. z pompą ciepła oraz instalację fotowoltaiczną 40 kW. Wartość 4,5 mln zł brutto, czas realizacji 10 miesięcy; część robót w trakcie zajęć szkolnych.`},
+  {g:"Inne sektory", t:"Fotowoltaika na budynkach gminy", x:`Budowa instalacji fotowoltaicznych o łącznej mocy 600 kW na 12 budynkach użyteczności publicznej gminy Brzeg Dolny wraz z magazynem energii. Budżet 3,8 mln zł netto, 8 miesięcy, dofinansowanie z programu FEnIKS.`}];
 
 async function viewAnalysis(){
   const draft = (() => { try{ return localStorage.getItem("rm_text") || ""; }catch{ return ""; } })();
@@ -128,11 +133,12 @@ async function viewAnalysis(){
     </div>
     <aside>
       <div class="help"><h4>Co warto napisać</h4>
-        <ul><li>rodzaj inwestycji (kanalizacja, wodociąg, oczyszczalnia…)</li><li>skalę: długość sieci, liczbę przyłączy, przepompownie</li>
+        <ul><li>rodzaj inwestycji (kanalizacja, droga, most, szkoła, fotowoltaika…)</li><li>skalę: długość sieci lub drogi, powierzchnię, moc, liczbę przyłączy</li>
           <li>planowany budżet i termin</li><li>formułę: gotowy projekt czy „zaprojektuj i wybuduj”</li>
           <li>miejsce i znane trudności (drogi, rzeki, grunty prywatne)</li></ul>
         <small>Brakujące informacje system wskaże w raporcie.</small></div>
-      <div class="help"><h4>Przykłady</h4><ul class="side-list">${EXAMPLES.map((e,i)=>`<li><button class="link-btn" data-ex="${i}">${ic("file")}${esc(e.t)}</button></li>`).join("")}</ul></div>
+      <div class="help"><h4>Przykłady</h4>${["Woda i kanalizacja","Inne sektory"].map(g => `<div class="muted" style="font-size:12px;margin:6px 0 2px">${g}</div>
+        <ul class="side-list">${EXAMPLES.map((e,i)=>({...e,i})).filter(e=>(e.g||"Woda i kanalizacja")===g).map(e=>`<li><button class="link-btn" data-ex="${e.i}">${ic("file")}${esc(e.t)}</button></li>`).join("")}</ul>`).join("")}</div>
       <div class="help" style="border:none"><h4>Odczyt opisu</h4>
         <div class="model-box">${ic("cpu")}<div>${L.enabled ? `Parametry odczytuje model językowy <b>${esc(L.model)}</b>
           ${L.online ? tag("dostępny","ok") : tag("niedostępny – użyte zostaną reguły","warn")}<br><small>${esc(L.data_location || "")}</small>`
@@ -194,11 +200,14 @@ function viewParams(q){
   <div class="card">
     <div class="card-head"><h2>Parametry wyszukiwania</h2><span class="legend">Źródło wartości: ${tag("model","model")} ${tag("model i reguły – zgodne","ok")} ${tag("reguły","grey")}</span></div>
     <div class="form-grid">
-      <div class="${fc("subsector")}"><label class="field" for="p_sub">Rodzaj inwestycji</label><select id="p_sub">${Object.entries(SUB).map(([k,n])=>`<option value="${k}" ${v("subsector")===k?"selected":""}>${n}</option>`).join("")}<option value="" ${!v("subsector")?"selected":""}>inny / nie wiem</option></select>${src("subsector")}</div>
+      <div class="${has("subsector") || (v("sector") && v("sector") !== "inne") ? "filled" : ""}"><label class="field" for="p_sub">Rodzaj inwestycji</label><select id="p_sub">
+        <optgroup label="Gospodarka wodno-ściekowa">${Object.entries(SUB).map(([k,n])=>`<option value="${k}" ${v("subsector")===k?"selected":""}>${n}</option>`).join("")}</optgroup>
+        <optgroup label="Inne sektory">${["drogi","kubatura","energetyka","kolej"].map(k=>`<option value="sector:${k}" ${!v("subsector") && v("sector")===k?"selected":""}>${SECT[k]}</option>`).join("")}
+        <option value="" ${!v("subsector") && (!v("sector") || v("sector")==="inne" || v("sector")==="wod-kan")?"selected":""}>inny / nie wiem</option></optgroup></select>${src(has("subsector") ? "subsector" : "sector")}</div>
       <div class="${fc("works_type")}"><label class="field" for="p_wt">Rodzaj robót</label><select id="p_wt"><option value="">nie określono</option>${WORKS.map(w=>`<option ${v("works_type")===w?"selected":""}>${w}</option>`).join("")}</select>${src("works_type")}</div>
       <div class="${fc("budget")}" style="grid-column:span 2"><label class="field" for="p_budget">Budżet (zł) <span id="p_budget_fmt" class="muted" style="font-weight:400">${v("budget") ? "= " + pln(v("budget")) : ""}</span></label><div class="row" style="flex-wrap:nowrap"><input id="p_budget" type="number" min="0" step="1000" value="${v("budget") ?? ""}" placeholder="np. 4200000" style="flex:1"><select id="p_vat" style="width:150px" aria-label="VAT">${["netto","brutto","nieokreślone"].map(x=>`<option ${v("budget_vat")===x?"selected":""}>${x}</option>`).join("")}</select></div>${src("budget")}</div>
       <div class="${fc("duration_days")}"><label class="field" for="p_dur">Czas realizacji (miesiące)</label><input id="p_dur" type="number" min="0" step="0.5" value="${months}">${src("duration_days")}</div>
-      <div class="${fc("length_km")}"><label class="field" for="p_len">Długość sieci (km)</label><input id="p_len" type="number" min="0" step="0.1" value="${v("length_km") ?? ""}">${src("length_km")}</div>
+      <div class="${fc("length_km")}"><label class="field" for="p_len">Długość (km) – sieci, drogi, torów</label><input id="p_len" type="number" min="0" step="0.1" value="${v("length_km") ?? ""}">${src("length_km")}</div>
       <div class="${fc("connections")}"><label class="field" for="p_con">Liczba przyłączy</label><input id="p_con" type="number" min="0" step="1" value="${v("connections") ?? ""}">${src("connections")}</div>
       <div class="${fc("province")}"><label class="field" for="p_prov">Województwo</label><select id="p_prov"><option value="">nie określono</option>${Object.entries(PROV).map(([k,n])=>`<option value="${k}" ${v("province")===k?"selected":""}>${n}</option>`).join("")}</select>${src("province")}</div>
       <div><label class="field">Formuła realizacji</label><label class="check" style="margin-top:6px"><input type="checkbox" id="p_db" ${v("design_build")?"checked":""}> „zaprojektuj i wybuduj”</label>${src("design_build")}</div>
@@ -215,7 +224,8 @@ function viewParams(q){
   $("#p_budget").oninput = () => { const x = Number($("#p_budget").value); $("#p_budget_fmt").textContent = x ? "= " + pln(x) : ""; };
   $("#run").onclick = async () => {
     const num = id => { const x = $(id).value; return x === "" ? null : Number(x); };
-    const overrides = { subsector: $("#p_sub").value, works_type: $("#p_wt").value, budget: num("#p_budget"), budget_vat: $("#p_vat").value,
+    const sv = $("#p_sub").value, isSect = sv.startsWith("sector:");
+    const overrides = { subsector: isSect ? "" : sv, sector: isSect ? sv.slice(7) : (sv ? "wod-kan" : "inne"), works_type: $("#p_wt").value, budget: num("#p_budget"), budget_vat: $("#p_vat").value,
       duration_days: num("#p_dur") != null ? Math.round(num("#p_dur")*30.44) : null, length_km: num("#p_len"), connections: num("#p_con"),
       province: $("#p_prov").value || null, design_build: $("#p_db").checked, features: $$("[data-feat]").filter(c=>c.checked).map(c=>c.dataset.feat) };
     const btn = $("#run"); btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Szukam podobnych inwestycji…`;
@@ -268,7 +278,7 @@ function renderReport(r){
     <div class="metric"><div class="lbl">Rzeczywisty czas robót</div><div class="val">${t.actual_days?.median ? (t.actual_days.median/30.44).toLocaleString("pl-PL",{maximumFractionDigits:1}) + " mies." : "b.d."}</div>
       <div class="sub">mediana · połowa trwała od ${days(t.actual_days?.p25)} do ${days(t.actual_days?.p75)}</div></div>
     <div class="metric ${b.verdict === "niski" ? "bad" : b.verdict === "wysoki" ? "warn" : b.verdict ? "ok" : ""}"><div class="lbl">Ocena budżetu</div>
-      <div class="val">${b.verdict ? b.verdict : "—"}</div><div class="sub">${b.user_per_km ? `${pln(b.user_per_km)}/km wobec mediany ${pln(b.per_km.median)}/km` : (b.per_km?.n ? `koszt 1 km: mediana ${pln(b.per_km.median)}` : "podaj budżet i długość sieci")}</div></div>
+      <div class="val">${b.verdict ? b.verdict : "—"}</div><div class="sub">${b.user_per_km ? `${pln(b.user_per_km)}/km wobec mediany ${pln(b.per_km.median)}/km` : (b.per_km?.n ? `koszt 1 km: mediana ${pln(b.per_km.median)}` : "podaj budżet i długość (sieci, drogi)")}</div></div>
   </div>
   <div class="grid g2">
     <div class="card"><div class="card-head"><h2>Podsumowanie</h2>${KIND_TAG.OBLICZ}</div>
@@ -387,7 +397,7 @@ function renderMethod(r, P){
   const rowp = (k, lab, f = x=>x) => { const p = r.query.params[k]; if(!p) return ""; const v = p.value;
     return `<tr><td>${lab}</td><td>${v==null||v===""||(Array.isArray(v)&&!v.length)?"—":esc(f(v))}</td><td>${esc(p.source||"")}</td><td><small>${esc((p.quote||"").slice(0,140))}</small></td></tr>`; };
   return `<h3>Parametry użyte do wyszukiwania</h3><div class="table-wrap"><table><thead><tr><th>Parametr</th><th>Wartość</th><th>Źródło</th><th>Cytat z opisu</th></tr></thead><tbody>
-    ${rowp("subsector","Podsektor",v=>SUB[v]||v)}${rowp("works_type","Rodzaj robót")}${rowp("design_build","Zaprojektuj i wybuduj",v=>v?"tak":"nie")}
+    ${rowp("sector","Sektor",v=>SECT[v]||v)}${rowp("subsector","Podsektor wod-kan",v=>SUB[v]||v)}${rowp("works_type","Rodzaj robót")}${rowp("design_build","Zaprojektuj i wybuduj",v=>v?"tak":"nie")}
     ${rowp("budget","Budżet",pln)}${rowp("budget_vat","VAT")}${rowp("duration_days","Czas (dni)")}${rowp("length_km","Długość (km)")}
     ${rowp("connections","Przyłącza")}${rowp("province","Województwo",v=>PROV[v]||v)}${rowp("features","Elementy",v=>v.map(x=>FEATS[x]||x).join(", "))}</tbody></table></div>
     <h3 style="margin-top:16px">Metoda</h3><ul>${Object.entries(r.method).map(([k,v])=>`<li><b>${esc(k)}</b>: ${esc(v)}</li>`).join("")}
@@ -429,7 +439,7 @@ async function showCase(tid){
   $("#modalTitle").textContent = p.title || tid;
   const o = p.organization || {};
   $("#modalBody").innerHTML = `
-    <div class="row" style="margin-bottom:8px">${tag(SUB[p.subsector]||p.sector||"","grey")}${tag(p.status||"","grey")}${p.exemplary?tag("wzorcowy","ok"):""}<div class="spacer"></div>
+    <div class="row" style="margin-bottom:8px">${tag(SUB[p.subsector]||SECT[p.sector]||p.sector||"","grey")}${tag(p.status||"","grey")}${p.exemplary?tag("wzorcowy","ok"):""}<div class="spacer"></div>
       <button class="small" id="exBtn">${p.exemplary?"Usuń oznaczenie wzorcowego":`${ic("star")}Oznacz jako wzorcowy`}</button>
       ${tid.startsWith("ocds")?`<a class="btn small" target="_blank" rel="noopener" href="https://ezamowienia.gov.pl/mp-client/search/list/${esc(tid)}">${ic("external")}e-Zamówienia</a>`:""}</div>
     <dl class="kv"><dt>Zamawiający</dt><dd>${esc(p.org_name)} (NIP ${esc(p.nip||"—")}) · ${esc(PROV[p.province]||"")} ${o.email?`· ${esc(o.email)}`:""} ${o.phone?`· tel. ${esc(o.phone)}`:""}</dd>
@@ -611,7 +621,7 @@ async function viewCases(){
     const r = await api(`/api/cases?${p}`);
     $("#f_info").textContent = `${r.total.toLocaleString("pl-PL")} wyników${r.total>200?" (pokazano 200)":""}`;
     $("#caseTable").innerHTML = r.items.length ? `<div class="table-wrap"><table><thead><tr><th>Inwestycja</th><th>Zamawiający</th><th>Rok</th><th>Wartość umów</th><th>Zmiana kosztu</th><th>Termin</th><th>Zmiany</th><th>Ryzyka</th></tr></thead><tbody>
-      ${r.items.map(x=>`<tr class="click" data-case="${esc(x.tender_id)}"><td><b>${esc(x.title)}</b>${x.exemplary?" "+tag("wzorcowy","ok"):""}<br><small>${esc(SUB[x.subsector]||x.sector||"")} · ${esc(x.status||"")}</small></td>
+      ${r.items.map(x=>`<tr class="click" data-case="${esc(x.tender_id)}"><td><b>${esc(x.title)}</b>${x.exemplary?" "+tag("wzorcowy","ok"):""}<br><small>${esc(SUB[x.subsector]||SECT[x.sector]||x.sector||"")} · ${esc(x.status||"")}</small></td>
         <td>${esc(x.org_name)}<br><small>${esc(PROV[x.province]||"")}</small></td><td>${x.year||""}</td><td class="num">${pln(x.contract_value)}</td>
         <td class="num">${x.cost_change_pct==null?"–":sgn(x.cost_change_pct)}</td><td>${x.delayed===1?tag("po terminie","bad"):x.delayed===0?tag("w terminie","ok"):"–"}</td>
         <td class="num">${x.n_changes||0}</td><td>${x.risk_codes.map(c=>`<span class="chip" title="${esc(riskName(c))}">${esc(c)}</span>`).join("")}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">Brak wyników.</div>`;
@@ -897,7 +907,7 @@ async function viewAbout(){
       <dt>Przetwarzanie danych</dt><dd>${esc(s.llm.data_location || "lokalnie")}</dd>
       <dt>Zmiana modelu</dt><dd>plik <code>config.toml</code> (sekcja [llm]) – bez zmian w kodzie; obsługa Ollama (np. Bielik) i API zgodnych z OpenAI</dd>
       <dt>Ostatnia aktualizacja</dt><dd>${esc(d.last_update||"")}</dd>
-      <dt>Sektory w bazie</dt><dd>${d.sectors.map(x=>`${esc(x.sector)}: ${x.n.toLocaleString("pl-PL")}`).join(" · ")}</dd></dl>
+      <dt>Sektory w bazie</dt><dd><ul class="clean">${d.sectors.map(x=>`<li>${esc(SECT[x.sector]||x.sector)}: <b>${x.n.toLocaleString("pl-PL")}</b> postępowań, ${(x.completed||0).toLocaleString("pl-PL")} z wynikiem realizacji</li>`).join("")}</ul></dd></dl>
       <p class="muted" style="margin-top:10px">Liczby i wnioski są zawsze oznaczone: ${KIND_TAG.DANE} ${KIND_TAG.OBLICZ} ${KIND_TAG.WNIOSEK}</p></div>
   </div>`;
 }
